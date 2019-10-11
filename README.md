@@ -6,4 +6,4 @@ Notes and examples for the course **Introduction to Portfolio Construction and A
   1. Returns and Value at Risk
   2. Introduction to Portfolio Optimization
   3. Beyond diversification
-  4. introduction to Asset-Liability Management
+  4. Introduction to Asset-Liability Management
