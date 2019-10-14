@@ -132,7 +132,6 @@ def annualize_rets(s, periods_per_year):
     n_period_growth = s.shape[0]
     return growth**(periods_per_year/n_period_growth) - 1
 
-
 def annualize_vol(s, periods_per_year):
     '''
     Computes the volatility per year, or, annualized volatility
@@ -141,3 +140,20 @@ def annualize_vol(s, periods_per_year):
     case of yearly, weekly, and daily data
     '''
     return s.std() * (periods_per_year)**(0.5)
+
+def sharpe_ratio(s, risk_free_rate, periods_per_year):
+    '''
+    Computes the annualized sharpe ratio of a pd.Series of returns. 
+    The variable periods_per_year can be, e.g., 12, 52, 252, in 
+    case of yearly, weekly, and daily data.
+    The variable risk_free_rate is the annual one.
+    '''
+    # convert the annual risk free rate to the period assuming that:
+    # RFR_year = (1+RFR_period)^{periods_per_year} - 1. Hence:
+    rf_to_period = (1 + risk_free_rate)**(1/periods_per_year) - 1
+    excess_return = s - rf_to_period
+    # now, annualize the excess return
+    ann_ex_rets = annualize_rets(excess_return, periods_per_year 
+    # compute annualized volatility
+    ann_vol = annualize_vol(s, periods_per_year)
+    return ann_ex_rets / ann_vol
