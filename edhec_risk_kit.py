@@ -123,8 +123,21 @@ def cvar_historic(s, level=0.05):
 
 def annualize_rets(s, periods_per_year):
     '''
-    Computes the return per year, or, annualized return.
+    Takes in input a pd.Series of returns and 
+    computes the return per year, or, annualized return.
+    The variable periods_per_year can be, e.g., 12, 52, 252, in 
+    case of yearly, weekly, and daily data
     '''
     growth = (1 + s).prod()
     n_period_growth = s.shape[0]
     return growth**(periods_per_year/n_period_growth) - 1
+
+
+def annualize_vol(s, periods_per_year):
+    '''
+    Computes the volatility per year, or, annualized volatility
+    of a pd.Series of returns. 
+    The variable periods_per_year can be, e.g., 12, 52, 252, in 
+    case of yearly, weekly, and daily data
+    '''
+    return s.std() * (periods_per_year)**(0.5)
