@@ -120,3 +120,11 @@ def cvar_historic(s, level=0.05):
         return -s[mask].mean()
     else:
         raise TypeError("Expected pd.DataFrame or pd.Series")
+
+def annualize_rets(s, periods_per_year):
+    '''
+    Computes the return per year, or, annualized return.
+    '''
+    growth = (1 + s).prod()
+    n_period_growth = s.shape[0]
+    return growth**(periods_per_year/n_period_growth) - 1
