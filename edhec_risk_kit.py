@@ -153,7 +153,7 @@ def sharpe_ratio(s, risk_free_rate, periods_per_year):
     rf_to_period = (1 + risk_free_rate)**(1/periods_per_year) - 1
     excess_return = s - rf_to_period
     # now, annualize the excess return
-    ann_ex_rets = annualize_rets(excess_return, periods_per_year 
+    ann_ex_rets = annualize_rets(excess_return, periods_per_year)
     # compute annualized volatility
     ann_vol = annualize_vol(s, periods_per_year)
     return ann_ex_rets / ann_vol
