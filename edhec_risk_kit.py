@@ -22,6 +22,19 @@ def get_hfi_returns():
     hfi = hfi / 100
     # the index is already of type datetime
     return hfi 
+
+def compute_returns(s):
+    '''
+    Computes the returns (percentage change) of a Dataframe of Series. 
+    In the former case, it computes the returns for every column (Series) by using pd.aggregate
+    '''
+    if isinstance(s, pd.DataFrame):
+        return s.aggregate( compute_returns )
+    elif isinstance(s, pd.Series):
+        return s / s.shift(1) - 1
+    else:
+        raise TypeError("Expected pd.DataFrame or pd.Series")
+
     
 def drawdown(returns: pd.Series):
     '''
