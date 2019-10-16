@@ -179,32 +179,18 @@ def annualize_vol(s, periods_per_year):
     elif isinstance(s, (int,float)):
         return s * (periods_per_year)**(0.5)
 
-def sharpe_ratio(s, risk_free_rate, periods_per_year):
+def sharpe_ratio(s, risk_free_rate, periods_per_year, v=None):
     '''
-    Computes the annualized sharpe ratio of a pd.Series of returns. 
-    The variable periods_per_year can be, e.g., 12, 52, 252, in 
-    case of yearly, weekly, and daily data.
+    Computes the annualized sharpe ratio. 
+    The variable periods_per_year can be, e.g., 12, 52, 252, in case of yearly, weekly, and daily data.
     The variable risk_free_rate is the annual one.
-    '''
-    # convert the annual risk free rate to the period assuming that:
-    # RFR_year = (1+RFR_period)^{periods_per_year} - 1. Hence:
-    rf_to_period = (1 + risk_free_rate)**(1/periods_per_year) - 1
-    excess_return = s - rf_to_period
-    # now, annualize the excess return
-    ann_ex_rets = annualize_rets(excess_return, periods_per_year)
-    # compute annualized volatility
-    ann_vol = annualize_vol(s, periods_per_year)
-    return ann_ex_rets / ann_vol
-
-def sharpe_ratio_2(s, risk_free_rate, periods_per_year, v=None):
-    '''
-    Computes the annualized sharpe ratio of a pd.Series of returns. 
-    The variable periods_per_year can be, e.g., 12, 52, 252, in 
-    case of yearly, weekly, and daily data.
-    The variable risk_free_rate is the annual one.
+    The method takes in input either a DataFrame, a Series or a single number. 
+    In the former case, it computes the annualized sharpe ratio of every column (Series) by using pd.aggregate. 
+    In the latter case, s is the (allready annualized) return and v is the (already annualized) volatility 
+    computed beforehand, for example, in case of a portfolio.
     '''
     if isinstance(s, pd.DataFrame):
-        return s.aggregate( sharpe_ratio_2, risk_free_rate=risk_free_rate, periods_per_year=periods_per_year )
+        return s.aggregate( sharpe_ratio, risk_free_rate=risk_free_rate, periods_per_year=periods_per_year, v=None)
     elif isinstance(s, pd.Series):
         # convert the annual risk free rate to the period assuming that:
         # RFR_year = (1+RFR_period)^{periods_per_year} - 1. Hence:
@@ -216,7 +202,16 @@ def sharpe_ratio_2(s, risk_free_rate, periods_per_year, v=None):
         ann_vol = annualize_vol(s, periods_per_year)
         return ann_ex_rets / ann_vol
     elif isinstance(s, (int,float)) and v is not None:
-        # here, s is supposed to be the single (annnualized) return 
-        # and v to be the single annualized volatility
-        rf_to_period = (1 + risk_free_rate)**(1/periods_per_year) - 1        
-        return (s - rf_to_period) / v
+        # Portfolio case: s is supposed to be the single (already annnualized) 
+        # return of the portfolio and v to be the single (already annualized) volatility. 
+        return (s - risk_free_rate) / v
+    
+def portfolio_return(vec_returns, weights):
+    '''
+    Computes the return of a portfolio. 
+    It takes in input a row vector of weights (list of np.array) 
+    and a column vector (or pd.Series) of returns
+    '''
+    return np.dot(weights, vec_returns)
+    
+    
