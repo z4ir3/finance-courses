@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import scipy.stats
+from scipy.optimize import minimize
 
 def get_ffme_returns():
     '''
@@ -167,7 +168,7 @@ def annualize_vol(s, periods_per_year):
     Computes the volatility per year, or, annualized volatility.
     The variable periods_per_year can be, e.g., 12, 52, 252, in 
     case of yearly, weekly, and daily data.
-    The method takes in input either a DataFrame, a Series or a single number. 
+    The method takes in input either a DataFrame, a Series, a list or a single number. 
     In the former case, it computes the annualized volatility of every column 
     (Series) by using pd.aggregate. In the latter case, s is a volatility 
     computed beforehand, hence only annulization is done
@@ -176,6 +177,8 @@ def annualize_vol(s, periods_per_year):
         return s.aggregate(annualize_vol, periods_per_year=periods_per_year )
     elif isinstance(s, pd.Series):
         return s.std() * (periods_per_year)**(0.5)
+    elif isinstance(s, list):
+        return np.std(s) * (periods_per_year)**(0.5)
     elif isinstance(s, (int,float)):
         return s * (periods_per_year)**(0.5)
 
@@ -206,7 +209,7 @@ def sharpe_ratio(s, risk_free_rate, periods_per_year, v=None):
         # return of the portfolio and v to be the single (already annualized) volatility. 
         return (s - risk_free_rate) / v
     
-def portfolio_return(vec_returns, weights):
+def portfolio_return(weights, vec_returns):
     '''
     Computes the return of a portfolio. 
     It takes in input a row vector of weights (list of np.array) 
@@ -214,12 +217,68 @@ def portfolio_return(vec_returns, weights):
     '''
     return np.dot(weights, vec_returns)
     
-def portfolio_volatility(cov_rets, weights):
+def portfolio_volatility(weights, cov_rets):
     '''
     Computes the volatility of a portfolio. 
     It takes in input a vector of weights (np.array or pd.Series) 
     and the covariance matrix of the portfolio asset returns
     '''
     return ( np.dot(weights.T, np.dot(cov_rets, weights)) )**(0.5) 
+
+
+
+def effront_two_assets(n_portfolios, rets, covmat, periods_per_year, risk_free_rate=0.0):
+    '''
+    Return the efficient frontiers for a portfolio of two assets. 
+    It returns a dataframe containing the volatilitis, the returns, the sharpe ratios of 
+    the portfolios as well as a plot of the efficient frontier.
+    The variable periods_per_year can be, e.g., 12, 52, 252, in case of yearly, weekly, and daily data.
+    '''
+    weights = [np.array([w,1-w]) for w in np.linspace(0,1,n_portfolios)]
+
+    # portfolio returns
+    ann_rets      = annualize_rets(rets, periods_per_year)
+    portfolio_ret = [portfolio_return(w, ann_rets) for w in weights]
     
+    # portfolio volatility
+    vols          = [portfolio_volatility(w, covmat) for w in weights] 
+    portfolio_vol = [annualize_vol(v, periods_per_year) for v in vols]
     
+    # portfolio sharpe ratio
+    portfolio_spr = [sharpe_ratio(r, risk_free_rate, periods_per_year, v=v) for r,v in zip(portfolio_ret,portfolio_vol)]
+    
+    df = pd.DataFrame({"volatility": portfolio_vol,
+                       "return": portfolio_ret,
+                       "sharpe ratio": portfolio_spr})
+    return df, df.plot.line(x="volatility", y="return", style=".-", grid=True)
+
+
+
+
+def minimize_volatility(target_return, rets, covmatrix):
+    '''
+    Returns the optimal weights corresponding to the minimum volatility
+    portfolio with a given expected target_return
+    '''
+    n_assets = rets.shape[0]
+    # initial guess weights, equally spaced weights
+    init_guess = np.repeat(1/n_assets, n_assets)
+    # bounds of each individual weight, i.e., w between 0 and 1
+    bounds = ((0.0,1.0),)*n_assets 
+    return_constraint = {
+        "type": "eq",  # means that the constraint is an equality
+        "args": (rets,),
+        "fun": lambda w, r: target_return - portfolio_return(w, r)
+    }
+    weights_constraint = {
+        "type": "eq",
+        "fun": lambda w: 1.0 - np.sum(w)  
+    }
+    result = minimize(portfolio_volatility, 
+                      init_guess,
+                      args=(covmatrix,),
+                      method="SLSQP",
+                      options={"disp": False},
+                      constraints=(return_constraint, weights_constraint),
+                      bounds=bounds)    
+    return result.x
