@@ -255,6 +255,48 @@ def effront_two_assets(n_portfolios, rets, covmat, periods_per_year, risk_free_r
 
 
 
+
+
+
+
+
+def optimal_weights(n_rets, rets, covmatrix, periods_per_year):
+    ann_returns = annualize_rets(rets, periods_per_year)
+    target_rets = np.linspace(ann_returns.min(), ann_returns.max(), n_rets)
+    weights = [minimize_volatility(target, ann_returns, covmatrix) for target in target_rets]
+    return weights
+
+
+def effront_n_assets(n_portfolios, rets, covmat, periods_per_year, risk_free_rate=0.0, iplot=False):
+    '''
+    Return the efficient frontiers for a portfolio of two assets. 
+    It returns a dataframe containing the volatilitis, the returns, the sharpe ratios of 
+    the portfolios as well as a plot of the efficient frontier.
+    The variable periods_per_year can be, e.g., 12, 52, 252, in case of yearly, weekly, and daily data.
+    '''
+    weights = optimal_weights(n_portfolios, rets, covmat, periods_per_year) 
+
+    # portfolio returns
+    ann_rets      = annualize_rets(rets, periods_per_year)
+    portfolio_ret = [portfolio_return(w, ann_rets) for w in weights]
+    
+    # portfolio volatility
+    vols          = [portfolio_volatility(w, covmat) for w in weights] 
+    portfolio_vol = [annualize_vol(v, periods_per_year) for v in vols]
+    
+    # portfolio sharpe ratio
+    portfolio_spr = [sharpe_ratio(r, risk_free_rate, periods_per_year, v=v) for r,v in zip(portfolio_ret,portfolio_vol)]
+    
+    df = pd.DataFrame({"volatility": portfolio_vol,
+                       "return": portfolio_ret,
+                       "sharpe ratio": portfolio_spr})
+    if iplot:
+        return df, df.plot.line(x="volatility", y="return", style=".-", grid=True)
+    else: 
+        return df
+
+
+
 def minimize_volatility(target_return, rets, covmatrix):
     '''
     Returns the optimal weights corresponding to the minimum volatility
