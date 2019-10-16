@@ -23,6 +23,19 @@ def get_hfi_returns():
     # the index is already of type datetime
     return hfi 
 
+def get_ind_returns():
+    '''
+    Load and format the Ken French 30 Industry portfolios value weighted monthly returns 
+    '''
+    ind = pd.read_csv("data/ind30_m_vw_rets.csv", index_col=0, parse_dates=True)
+    # Divide by 100, since they are returns
+    ind = ind / 100
+    # the index is not yet of type datetime
+    ind.index = pd.to_datetime(ind.index, format="%Y%m") #.to_period("M") forces the index to be monthly period...
+    # there will be blank spaces in the columns names
+    ind.columns = ind.columns.str.strip()
+    return ind
+
 def compute_returns(s):
     '''
     Computes the returns (percentage change) of a Dataframe of Series. 
@@ -154,8 +167,17 @@ def annualize_vol(s, periods_per_year):
     Computes the volatility per year, or, annualized volatility.
     The variable periods_per_year can be, e.g., 12, 52, 252, in 
     case of yearly, weekly, and daily data.
+    The method takes in input either a DataFrame, a Series or a single number. 
+    In the former case, it computes the annualized volatility of every column 
+    (Series) by using pd.aggregate. In the latter case, s is a volatility 
+    computed beforehand, hence only annulization is done
     '''
-    return s.std() * (periods_per_year)**(0.5)
+    if isinstance(s, pd.DataFrame):
+        return s.aggregate(annualize_vol, periods_per_year=periods_per_year )
+    elif isinstance(s, pd.Series):
+        return s.std() * (periods_per_year)**(0.5)
+    elif isinstance(s, (int,float)):
+        return s * (periods_per_year)**(0.5)
 
 def sharpe_ratio(s, risk_free_rate, periods_per_year):
     '''
@@ -173,7 +195,6 @@ def sharpe_ratio(s, risk_free_rate, periods_per_year):
     # compute annualized volatility
     ann_vol = annualize_vol(s, periods_per_year)
     return ann_ex_rets / ann_vol
-
 
 def sharpe_ratio_2(s, risk_free_rate, periods_per_year, v=None):
     '''
