@@ -214,4 +214,12 @@ def portfolio_return(vec_returns, weights):
     '''
     return np.dot(weights, vec_returns)
     
+def portfolio_volatility(cov_rets, weights):
+    '''
+    Computes the volatility of a portfolio. 
+    It takes in input a vector of weights (np.array or pd.Series) 
+    and the covariance matrix of the portfolio asset returns
+    '''
+    return ( np.dot(weights.T, np.dot(cov_rets, weights)) )**(0.5) 
+    
     
