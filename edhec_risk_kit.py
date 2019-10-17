@@ -292,30 +292,37 @@ def efficient_frontier(n_portfolios, rets, covmat, periods_per_year, risk_free_r
     else: 
         return df
 
-def minimize_volatility(target_return, rets, covmatrix):
+def minimize_volatility(rets, covmatrix, target_return=None):
     '''
-    Returns the optimal weights corresponding to the minimum volatility
-    portfolio constructed by fixing an expected target_return. 
-    Such a portfolio lies on the efficient frontier.
+    Returns the optimal weights of the minimum volatility portfolio on the effient frontier. 
+    If target_return is not None, then the weights correspond to the minimum volatility portfolio 
+    having a fixed target return. 
+    The method uses the scipy minimize optimizer which solves the minimization problem 
+    for the volatility of the portfolio
     '''
     n_assets = rets.shape[0]
     # initial guess weights
     init_guess = np.repeat(1/n_assets, n_assets)
-    return_constraint = {
-        "type": "eq",  # means that the constraint is an equality
-        "args": (rets,),
-        "fun": lambda w, r: target_return - portfolio_return(w, r)
-    }
     weights_constraint = {
         "type": "eq",
         "fun": lambda w: 1.0 - np.sum(w)  
     }
+    if target_return is not None:
+        return_constraint = {
+            "type": "eq",
+            "args": (rets,),
+            "fun": lambda w, r: target_return - portfolio_return(w, r)
+        }
+        constr = (return_constraint, weights_constraint)
+    else:
+        constr = weights_constraint
+        
     result = minimize(portfolio_volatility, 
                       init_guess,
                       args = (covmatrix,),
                       method = "SLSQP",
                       options = {"disp": False},
-                      constraints = (return_constraint, weights_constraint),
+                      constraints = constr,
                       bounds = ((0.0,1.0),)*n_assets ) # bounds of each individual weight, i.e., w between 0 and 1
     return result.x
 
@@ -326,5 +333,5 @@ def optimal_weights(n_points, rets, covmatrix, periods_per_year):
     The weights are obtaine by solving the minimization problem for the volatility. 
     '''
     target_rets = np.linspace(rets.min(), rets.max(), n_points)    
-    weights = [minimize_volatility(target, rets, covmatrix) for target in target_rets]
+    weights = [minimize_volatility(rets, covmatrix, target) for target in target_rets]
     return weights
