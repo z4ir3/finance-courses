@@ -227,40 +227,6 @@ def portfolio_volatility(weights, cov_rets):
 
 
 
-def effront_two_assets(n_portfolios, rets, covmat, periods_per_year, risk_free_rate=0.0):
-    '''
-    Return the efficient frontiers for a portfolio of two assets. 
-    It returns a dataframe containing the volatilitis, the returns, the sharpe ratios of 
-    the portfolios as well as a plot of the efficient frontier.
-    The variable periods_per_year can be, e.g., 12, 52, 252, in case of yearly, weekly, and daily data.
-    '''
-    weights = [np.array([w,1-w]) for w in np.linspace(0,1,n_portfolios)]
-
-    # portfolio returns
-    ann_rets      = annualize_rets(rets, periods_per_year)
-    portfolio_ret = [portfolio_return(w, ann_rets) for w in weights]
-    
-    # portfolio volatility
-    vols          = [portfolio_volatility(w, covmat) for w in weights] 
-    portfolio_vol = [annualize_vol(v, periods_per_year) for v in vols]
-    
-    # portfolio sharpe ratio
-    portfolio_spr = [sharpe_ratio(r, risk_free_rate, periods_per_year, v=v) for r,v in zip(portfolio_ret,portfolio_vol)]
-    
-    df = pd.DataFrame({"volatility": portfolio_vol,
-                       "return": portfolio_ret,
-                       "sharpe ratio": portfolio_spr})
-    return df, df.plot.line(x="volatility", y="return", style=".-", grid=True)
-
-
-
-
-
-
-
-
-
-
 
 def efficient_frontier(n_portfolios, rets, covmat, periods_per_year, risk_free_rate=0.0, iplot=False):
     '''
@@ -273,6 +239,8 @@ def efficient_frontier(n_portfolios, rets, covmat, periods_per_year, risk_free_r
     
     # generates optimal weights of porfolios lying of the efficient frontiers
     weights = optimal_weights(n_portfolios, ann_rets, covmat, periods_per_year) 
+    # in alternative, if only the portfolio consists of only two assets, the weights can be: 
+    #weights = [np.array([w,1-w]) for w in np.linspace(0,1,n_portfolios)]
 
     # portfolio returns
     portfolio_ret = [portfolio_return(w, ann_rets) for w in weights]
@@ -291,6 +259,18 @@ def efficient_frontier(n_portfolios, rets, covmat, periods_per_year, risk_free_r
         return df, df.plot.line(x="volatility", y="return", style=".-", grid=True, label="Efficient frontier")
     else: 
         return df
+    
+def optimal_weights(n_points, rets, covmatrix, periods_per_year):
+    '''
+    Returns a set of n_points optimal weights corresponding to portfolios (of the efficient frontier) 
+    with minimum volatility constructed by fixing n_points target returns. 
+    The weights are obtaine by solving the minimization problem for the volatility. 
+    '''
+    target_rets = np.linspace(rets.min(), rets.max(), n_points)    
+    weights = [minimize_volatility(rets, covmatrix, target) for target in target_rets]
+    return weights
+
+
 
 def minimize_volatility(rets, covmatrix, target_return=None):
     '''
@@ -326,12 +306,54 @@ def minimize_volatility(rets, covmatrix, target_return=None):
                       bounds = ((0.0,1.0),)*n_assets ) # bounds of each individual weight, i.e., w between 0 and 1
     return result.x
 
-def optimal_weights(n_points, rets, covmatrix, periods_per_year):
+
+
+
+def neg_portfolio_sharpe_ratio(weights, rets, covmatrix, risk_free_rate, periods_per_year):
     '''
-    Returns a set of n_points optimal weights corresponding to portfolios (of the efficient frontier) 
-    with minimum volatility constructed by fixing n_points target returns. 
-    The weights are obtaine by solving the minimization problem for the volatility. 
+    Computes the negative annualized sharpe ratio for minimization problem of optimal portfolios.
+    The variable periods_per_year can be, e.g., 12, 52, 252, in case of yearly, weekly, and daily data.
+    The variable risk_free_rate is the annual one.
     '''
-    target_rets = np.linspace(rets.min(), rets.max(), n_points)    
-    weights = [minimize_volatility(rets, covmatrix, target) for target in target_rets]
-    return weights
+    # annualized portfolio returns
+    portfolio_ret = portfolio_return(weights, rets)        
+
+    # annualized portfolio volatility
+    portfolio_vol = portfolio_volatility(weights, covmatrix)
+    portfolio_vol = annualize_vol(portfolio_vol, periods_per_year)
+
+    return - sharpe_ratio(portfolio_ret, risk_free_rate, periods_per_year, v=portfolio_vol)    
+    #i.e., simply returns  -(portfolio_ret - risk_free_rate)/portfolio_vol
+
+def maximize_shape_ratio(rets, covmatrix, risk_free_rate, periods_per_year, target_volatility=None):
+    '''
+    Returns the optimal weights of the highest sharpe ratio portfolio on the effient frontier. 
+    If target_volatility is not None, then the weights correspond to the highest sharpe ratio portfolio 
+    having a fixed target volatility. 
+    The method uses the scipy minimize optimizer which solves the maximization of the sharpe ratio which 
+    is equivalent to minimize the negative sharpe ratio.
+    '''
+    n_assets   = rets.shape[0] 
+    init_guess = np.repeat(1/n_assets, n_assets)
+    weights_constraint = {
+        "type": "eq",
+        "fun": lambda w: 1.0 - np.sum(w)  
+    }
+    if target_volatility is not None:
+        volatility_constraint = {
+            "type": "eq",
+            "args": (covmatrix, periods_per_year),
+            "fun": lambda w, cov, p: target_volatility - annualize_vol(portfolio_volatility(w, cov), p)
+        }
+        constr = (volatility_constraint, weights_constraint)
+    else:
+        constr = weights_constraint
+        
+    result = minimize(neg_portfolio_sharpe_ratio,
+                      init_guess,
+                      args = (rets, covmatrix, risk_free_rate, periods_per_year),
+                      method = "SLSQP",
+                      options = {"disp": False},
+                      constraints = constr,
+                      bounds = ((0.0,1.0),)*n_assets)
+    return result.x
