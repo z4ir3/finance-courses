@@ -260,24 +260,21 @@ def effront_two_assets(n_portfolios, rets, covmat, periods_per_year, risk_free_r
 
 
 
-def optimal_weights(n_rets, rets, covmatrix, periods_per_year):
-    ann_returns = annualize_rets(rets, periods_per_year)
-    target_rets = np.linspace(ann_returns.min(), ann_returns.max(), n_rets)
-    weights = [minimize_volatility(target, ann_returns, covmatrix) for target in target_rets]
-    return weights
 
 
-def effront_n_assets(n_portfolios, rets, covmat, periods_per_year, risk_free_rate=0.0, iplot=False):
+def efficient_frontier(n_portfolios, rets, covmat, periods_per_year, risk_free_rate=0.0, iplot=False):
     '''
-    Return the efficient frontiers for a portfolio of two assets. 
-    It returns a dataframe containing the volatilitis, the returns, the sharpe ratios of 
-    the portfolios as well as a plot of the efficient frontier.
+    Returns (and plots) the efficient frontiers for a portfolio of rets.shape[1] assets. 
+    The method returns a dataframe containing the volatilities, returns, and sharpe ratios of 
+    the portfolios as well as a plot of the efficient frontier in case iplot=True.
     The variable periods_per_year can be, e.g., 12, 52, 252, in case of yearly, weekly, and daily data.
-    '''
-    weights = optimal_weights(n_portfolios, rets, covmat, periods_per_year) 
+    '''    
+    ann_rets = annualize_rets(rets, periods_per_year)
+    
+    # generates optimal weights of porfolios lying of the efficient frontiers
+    weights = optimal_weights(n_portfolios, ann_rets, covmat, periods_per_year) 
 
     # portfolio returns
-    ann_rets      = annualize_rets(rets, periods_per_year)
     portfolio_ret = [portfolio_return(w, ann_rets) for w in weights]
     
     # portfolio volatility
@@ -291,22 +288,19 @@ def effront_n_assets(n_portfolios, rets, covmat, periods_per_year, risk_free_rat
                        "return": portfolio_ret,
                        "sharpe ratio": portfolio_spr})
     if iplot:
-        return df, df.plot.line(x="volatility", y="return", style=".-", grid=True)
+        return df, df.plot.line(x="volatility", y="return", style=".-", grid=True, label="Efficient frontier")
     else: 
         return df
-
-
 
 def minimize_volatility(target_return, rets, covmatrix):
     '''
     Returns the optimal weights corresponding to the minimum volatility
-    portfolio with a given expected target_return
+    portfolio constructed by fixing an expected target_return. 
+    Such a portfolio lies on the efficient frontier.
     '''
     n_assets = rets.shape[0]
-    # initial guess weights, equally spaced weights
+    # initial guess weights
     init_guess = np.repeat(1/n_assets, n_assets)
-    # bounds of each individual weight, i.e., w between 0 and 1
-    bounds = ((0.0,1.0),)*n_assets 
     return_constraint = {
         "type": "eq",  # means that the constraint is an equality
         "args": (rets,),
@@ -318,9 +312,19 @@ def minimize_volatility(target_return, rets, covmatrix):
     }
     result = minimize(portfolio_volatility, 
                       init_guess,
-                      args=(covmatrix,),
-                      method="SLSQP",
-                      options={"disp": False},
-                      constraints=(return_constraint, weights_constraint),
-                      bounds=bounds)    
+                      args = (covmatrix,),
+                      method = "SLSQP",
+                      options = {"disp": False},
+                      constraints = (return_constraint, weights_constraint),
+                      bounds = ((0.0,1.0),)*n_assets ) # bounds of each individual weight, i.e., w between 0 and 1
     return result.x
+
+def optimal_weights(n_points, rets, covmatrix, periods_per_year):
+    '''
+    Returns a set of n_points optimal weights corresponding to portfolios (of the efficient frontier) 
+    with minimum volatility constructed by fixing n_points target returns. 
+    The weights are obtaine by solving the minimization problem for the volatility. 
+    '''
+    target_rets = np.linspace(rets.min(), rets.max(), n_points)    
+    weights = [minimize_volatility(target, rets, covmatrix) for target in target_rets]
+    return weights
