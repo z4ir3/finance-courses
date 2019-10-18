@@ -1,7 +1,9 @@
 import pandas as pd
 import numpy as np
 import scipy.stats
+import matplotlib.pyplot as plt
 from scipy.optimize import minimize
+
 
 def get_ffme_returns():
     '''
@@ -227,8 +229,7 @@ def portfolio_volatility(weights, cov_rets):
 
 
 
-
-def efficient_frontier(n_portfolios, rets, covmat, periods_per_year, risk_free_rate=0.0, iplot=False):
+def efficient_frontier(n_portfolios, rets, covmat, periods_per_year, risk_free_rate=0.0, iplot=False, cml=False):
     '''
     Returns (and plots) the efficient frontiers for a portfolio of rets.shape[1] assets. 
     The method returns a dataframe containing the volatilities, returns, and sharpe ratios of 
@@ -256,9 +257,31 @@ def efficient_frontier(n_portfolios, rets, covmat, periods_per_year, risk_free_r
                        "return": portfolio_ret,
                        "sharpe ratio": portfolio_spr})
     if iplot:
-        return df, df.plot.line(x="volatility", y="return", style=".-", grid=True, label="Efficient frontier")
+        ax = df.plot.line(x="volatility", y="return", style="--", color="coral", grid=True, label="Efficient frontier", figsize=(8,4))
+        if cml:
+            w   = maximize_shape_ratio(ann_rets, covmat, risk_free_rate, periods_per_year)
+            ret = portfolio_return(w, ann_rets)
+            vol = annualize_vol( portfolio_volatility(w,covmat), periods_per_year)
+            # Draw the CML: the endpoints of the CML are [0,risk_free_rate] and [vol,ret]. This gives:
+            ax.plot([0, vol], [risk_free_rate, ret], color="g", marker="o", linestyle="-.", label="CML")
+            ax.set_xlim(left=0)
+            ax.set_ylim([0.0,0.32])
+            ax.legend()
+        return df, ax
     else: 
         return df
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
 def optimal_weights(n_points, rets, covmatrix, periods_per_year):
     '''
@@ -309,21 +332,7 @@ def minimize_volatility(rets, covmatrix, target_return=None):
 
 
 
-def neg_portfolio_sharpe_ratio(weights, rets, covmatrix, risk_free_rate, periods_per_year):
-    '''
-    Computes the negative annualized sharpe ratio for minimization problem of optimal portfolios.
-    The variable periods_per_year can be, e.g., 12, 52, 252, in case of yearly, weekly, and daily data.
-    The variable risk_free_rate is the annual one.
-    '''
-    # annualized portfolio returns
-    portfolio_ret = portfolio_return(weights, rets)        
 
-    # annualized portfolio volatility
-    portfolio_vol = portfolio_volatility(weights, covmatrix)
-    portfolio_vol = annualize_vol(portfolio_vol, periods_per_year)
-
-    return - sharpe_ratio(portfolio_ret, risk_free_rate, periods_per_year, v=portfolio_vol)    
-    #i.e., simply returns  -(portfolio_ret - risk_free_rate)/portfolio_vol
 
 def maximize_shape_ratio(rets, covmatrix, risk_free_rate, periods_per_year, target_volatility=None):
     '''
@@ -348,6 +357,19 @@ def maximize_shape_ratio(rets, covmatrix, risk_free_rate, periods_per_year, targ
         constr = (volatility_constraint, weights_constraint)
     else:
         constr = weights_constraint
+        
+    def neg_portfolio_sharpe_ratio(weights, rets, covmatrix, risk_free_rate, periods_per_year):
+        '''
+        Computes the negative annualized sharpe ratio for minimization problem of optimal portfolios.
+        The variable periods_per_year can be, e.g., 12, 52, 252, in case of yearly, weekly, and daily data.
+        The variable risk_free_rate is the annual one.
+        '''
+        # annualized portfolio returns
+        portfolio_ret = portfolio_return(weights, rets)        
+        # annualized portfolio volatility
+        portfolio_vol = annualize_vol(portfolio_volatility(weights, covmatrix), periods_per_year)
+        return - sharpe_ratio(portfolio_ret, risk_free_rate, periods_per_year, v=portfolio_vol)    
+        #i.e., simply returns  -(portfolio_ret - risk_free_rate)/portfolio_vol
         
     result = minimize(neg_portfolio_sharpe_ratio,
                       init_guess,
