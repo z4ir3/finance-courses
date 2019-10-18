@@ -229,13 +229,25 @@ def portfolio_volatility(weights, cov_rets):
 
 
 
-def efficient_frontier(n_portfolios, rets, covmat, periods_per_year, risk_free_rate=0.0, iplot=False, cml=False):
+def efficient_frontier(n_portfolios, rets, covmat, periods_per_year, risk_free_rate=0.0, 
+                       iplot=False, hsr=False, cml=False, mvp=False, ewp=False):
     '''
     Returns (and plots) the efficient frontiers for a portfolio of rets.shape[1] assets. 
-    The method returns a dataframe containing the volatilities, returns, and sharpe ratios of 
-    the portfolios as well as a plot of the efficient frontier in case iplot=True.
+    The method returns a dataframe containing the volatilities, returns, sharpe ratios and weights 
+    of the portfolios as well as a plot of the efficient frontier in case iplot=True. 
+    Other inputs are:
+        hsr: if true the method plots the highest return portfolio,
+        cml: if True the method plots the capital market line;
+        mvp: if True the method plots the minimum volatility portfolio;
+        ewp: if True the method plots the equally weigthed portfolio. 
     The variable periods_per_year can be, e.g., 12, 52, 252, in case of yearly, weekly, and daily data.
-    '''    
+    '''   
+    
+    def append_row_df(df,vol,ret,spr,weights):
+        temp_df = list(df.values)
+        temp_df.append( [vol, ret, spr,] + [w for w in weights] )
+        return pd.DataFrame(temp_df)
+        
     ann_rets = annualize_rets(rets, periods_per_year)
     
     # generates optimal weights of porfolios lying of the efficient frontiers
@@ -256,22 +268,48 @@ def efficient_frontier(n_portfolios, rets, covmat, periods_per_year, risk_free_r
     df = pd.DataFrame({"volatility": portfolio_vol,
                        "return": portfolio_ret,
                        "sharpe ratio": portfolio_spr})
+    df = pd.concat([df, pd.DataFrame(weights)],axis=1)
+    
     if iplot:
         ax = df.plot.line(x="volatility", y="return", style="--", color="coral", grid=True, label="Efficient frontier", figsize=(8,4))
-        if cml:
+        if hsr or cml:
             w   = maximize_shape_ratio(ann_rets, covmat, risk_free_rate, periods_per_year)
             ret = portfolio_return(w, ann_rets)
             vol = annualize_vol( portfolio_volatility(w,covmat), periods_per_year)
-            # Draw the CML: the endpoints of the CML are [0,risk_free_rate] and [vol,ret]. This gives:
-            ax.plot([0, vol], [risk_free_rate, ret], color="g", marker="o", linestyle="-.", label="CML")
-            ax.set_xlim(left=0)
-            ax.set_ylim([0.0,0.32])
+            spr = sharpe_ratio(ret, risk_free_rate, periods_per_year, v=vol)
+            df  = append_row_df(df,vol,ret,spr,w)
+            if cml:
+                # Draw the CML: the endpoints of the CML are [0,risk_free_rate] and [port_vol,port_ret]
+                ax.plot([0, vol], [risk_free_rate, ret], color="g", linestyle="-.", label="CML")
+                ax.set_xlim(left=0)
+                ax.legend()
+            if hsr:
+                # Plot the highest sharpe ratio portfolio
+                ax.scatter([vol], [ret], marker="o", color="g", label="Highest sharpe ratio portfolio")
+                ax.legend()
+        if mvp:
+            # Plot the equally weighted portfolio:
+            w   = minimize_volatility(ann_rets, covmat)
+            ret = portfolio_return(w, ann_rets)
+            vol = annualize_vol( portfolio_volatility(w,covmat), periods_per_year)
+            spr = sharpe_ratio(ret, risk_free_rate, periods_per_year, v=vol)
+            df  = append_row_df(df,vol,ret,spr,w)
+            ax.scatter([vol], [ret], color="midnightblue", marker="o", label="Minimum volatility portfolio")
+            ax.legend()  
+        if ewp:
+            # Plot the equally weighted portfolio:
+            w   = np.repeat(1/ann_rets.shape[0], ann_rets.shape[0])
+            ret = portfolio_return(w, ann_rets)
+            vol = annualize_vol( portfolio_volatility(w,covmat), periods_per_year)
+            spr = sharpe_ratio(ret, risk_free_rate, periods_per_year, v=vol)
+            df  = append_row_df(df,vol,ret,spr,w)
+            ax.scatter([vol], [ret], color="goldenrod", marker="o", label="Equally weighted portfolio")
             ax.legend()
         return df, ax
     else: 
         return df
     
-    
+
     
     
     
@@ -303,7 +341,7 @@ def minimize_volatility(rets, covmatrix, target_return=None):
     The method uses the scipy minimize optimizer which solves the minimization problem 
     for the volatility of the portfolio
     '''
-    n_assets = rets.shape[0]
+    n_assets = rets.shape[0]    
     # initial guess weights
     init_guess = np.repeat(1/n_assets, n_assets)
     weights_constraint = {
