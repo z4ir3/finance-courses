@@ -39,6 +39,39 @@ def get_ind_returns():
     ind.columns = ind.columns.str.strip()
     return ind
 
+
+
+
+def get_ind_nfirms():
+    '''
+    Load and format the Ken French 30 Industry portfolios 
+    '''
+    ind = pd.read_csv("data/ind30_m_nfirms.csv", index_col=0, parse_dates=True)
+    # the index is not yet of type datetime
+    ind.index = pd.to_datetime(ind.index, format="%Y%m") #.to_period("M") forces the index to be monthly period...
+    # there will be blank spaces in the columns names
+    ind.columns = ind.columns.str.strip()
+    return ind
+
+def get_ind_size():
+    '''
+    Load and format the Ken French 30 Industry portfolios
+    '''
+    ind = pd.read_csv("data/ind30_m_size.csv", index_col=0, parse_dates=True)
+    # the index is not yet of type datetime
+    ind.index = pd.to_datetime(ind.index, format="%Y%m") #.to_period("M") forces the index to be monthly period...
+    # there will be blank spaces in the columns names
+    ind.columns = ind.columns.str.strip()
+    return ind
+
+
+
+
+
+
+
+
+
 def compute_returns(s):
     '''
     Computes the returns (percentage change) of a Dataframe of Series. 
