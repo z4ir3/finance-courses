@@ -40,11 +40,9 @@ def get_ind_returns():
     return ind
 
 
-
-
 def get_ind_nfirms():
     '''
-    Load and format the Ken French 30 Industry portfolios 
+    Load and format the Ken French 30 Industry number of firms dataset
     '''
     ind = pd.read_csv("data/ind30_m_nfirms.csv", index_col=0, parse_dates=True)
     # the index is not yet of type datetime
@@ -55,7 +53,7 @@ def get_ind_nfirms():
 
 def get_ind_size():
     '''
-    Load and format the Ken French 30 Industry portfolios
+    Load and format the Ken French 30 Industry average (market cap) size
     '''
     ind = pd.read_csv("data/ind30_m_size.csv", index_col=0, parse_dates=True)
     # the index is not yet of type datetime
@@ -64,6 +62,23 @@ def get_ind_size():
     ind.columns = ind.columns.str.strip()
     return ind
 
+
+def get_total_market_index_returns():
+    '''
+    Computes the (total market) returns from the Ken French 30 Industry portfolio
+    '''
+    # Load the portfolio returns, number of firms, and average size
+    ind_rets   = get_ind_returns()
+    ind_nfirms = get_ind_nfirms()
+    ind_size   = get_ind_size()     
+    # compute the market capitalization of each industry sector
+    ind_mkt_cap = ind_nfirms * ind_size
+    # compute the total market capitalization
+    total_mkt_cap = ind_mkt_cap.sum(axis=1)
+    # compute the single market capitalizations as a percentage of the total market cap
+    ind_cap_weights = ind_mkt_cap.divide(total_mkt_cap, axis=0)
+    # finally, computes the total market returns         
+    return (ind_cap_weights * ind_rets).sum(axis=1)
 
 
 
@@ -85,14 +100,14 @@ def compute_returns(s):
         raise TypeError("Expected pd.DataFrame or pd.Series")
 
     
-def drawdown(returns: pd.Series):
+def drawdown(returns: pd.Series, capital=1.0):
     '''
     Drawdown: takes in input the returns of an asset and returns a dataframe containing 
     1. the associated wealth index (for an hypothetical investment of $1000) 
     2. all previous peaks 
     3. the drawdowns
     '''
-    wealth_index   = 1000 * (1 + returns).cumprod()
+    wealth_index   = capital * (1 + returns).cumprod()
     previous_peaks = wealth_index.cummax()
     drawdowns      = (wealth_index - previous_peaks ) / previous_peaks
     df = pd.DataFrame({"Wealth": wealth_index, "Peaks": previous_peaks, "Drawdown": drawdowns} )
@@ -342,11 +357,38 @@ def efficient_frontier(n_portfolios, rets, covmat, periods_per_year, risk_free_r
     else: 
         return df
     
-
     
+def summary_stats(s, risk_free_rate=0.03, periods_per_year=12, var_level=0.05):
+    '''
+    Returns a dataframe containing annualized returns, annualized volatility, sharpe ratio, 
+    skewness, kurtosis, historic VaR, Cornish-Fisher VaR, and Max Drawdown
+    '''
+    if isinstance(s, pd.Series):
+        stats = {
+            "Ann. return"  : annualize_rets(s, periods_per_year=periods_per_year),
+            "Ann. vol"     : annualize_vol(s, periods_per_year=periods_per_year),
+            "Sharpe ratio" : sharpe_ratio(s, risk_free_rate=risk_free_rate, periods_per_year=periods_per_year),
+            "Skewness"     : skewness(s),
+            "Kurtosis"     : kurtosis(s),
+            "Historic CVar": cvar_historic(s, level=var_level),
+            "C-F Var"      : var_gaussian(s, level=var_level, cf=True),
+            "Max drawdown" : drawdown(s)["Drawdown"].min()
+        }
+        return pd.DataFrame(stats, index=["0"])
     
-    
-    
+    elif isinstance(s, pd.DataFrame):        
+        stats     = {
+            "Ann. return"  : s.aggregate( annualize_rets, periods_per_year=periods_per_year ),
+            "Ann. vol"     : s.aggregate( annualize_vol,  periods_per_year=periods_per_year ),
+            "Sharpe ratio" : s.aggregate( sharpe_ratio, risk_free_rate=risk_free_rate, periods_per_year=periods_per_year ),
+            "Skewness"     : s.aggregate( skewness ),
+            "Kurtosis"     : s.aggregate( kurtosis ),
+            "Historic CVar": s.aggregate( cvar_historic, level=var_level ),
+            "C-F Var"      : s.aggregate( var_gaussian, level=var_level, cf=True ),
+            "Max Drawdown" : s.aggregate( lambda r: drawdown(r)["Drawdown"].min() )
+        } 
+        return pd.DataFrame(stats)
+ 
     
     
     
@@ -363,8 +405,6 @@ def optimal_weights(n_points, rets, covmatrix, periods_per_year):
     target_rets = np.linspace(rets.min(), rets.max(), n_points)    
     weights = [minimize_volatility(rets, covmatrix, target) for target in target_rets]
     return weights
-
-
 
 def minimize_volatility(rets, covmatrix, target_return=None):
     '''
@@ -399,11 +439,6 @@ def minimize_volatility(rets, covmatrix, target_return=None):
                       constraints = constr,
                       bounds = ((0.0,1.0),)*n_assets ) # bounds of each individual weight, i.e., w between 0 and 1
     return result.x
-
-
-
-
-
 
 def maximize_shape_ratio(rets, covmatrix, risk_free_rate, periods_per_year, target_volatility=None):
     '''
