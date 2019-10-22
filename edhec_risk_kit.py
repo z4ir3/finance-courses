@@ -478,7 +478,7 @@ def maximize_shape_ratio(rets, covmatrix, risk_free_rate, periods_per_year, targ
                       bounds = ((0.0,1.0),)*n_assets)
     return result.x
 
-def cppi(risky_rets, safe_rets=None, start_value=1000, floor=0.8, m=3, drawdown=0.02,
+def cppi(risky_rets, safe_rets=None, start_value=1000, floor=0.8, m=3, drawdown=None,
          risk_free_rate=0.03, periods_per_year=12):
     '''
     Run a backtest of the CPPI investment strategy given a set of returns for a risky asset
@@ -519,7 +519,6 @@ def cppi(risky_rets, safe_rets=None, start_value=1000, floor=0.8, m=3, drawdown=
         if drawdown is not None:
             # current peak
             peak = np.maximum(peak, account_value)
-            
             # current floor value
             floor_value = peak * (1 - drawdown)
             floor_history.iloc[step] = floor_value
@@ -561,9 +560,9 @@ def cppi(risky_rets, safe_rets=None, start_value=1000, floor=0.8, m=3, drawdown=
         "Safe returns"    : safe_rets
     }
     if drawdown is not None:
-        backtest_result.update( {
+        backtest_result.update({
             "Floor value": floor_history,
             "Peaks"      : peak_history
-        } )
+        })
 
     return backtest_result
