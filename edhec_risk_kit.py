@@ -357,7 +357,6 @@ def efficient_frontier(n_portfolios, rets, covmat, periods_per_year, risk_free_r
     else: 
         return df
     
-    
 def summary_stats(s, risk_free_rate=0.03, periods_per_year=12, var_level=0.05):
     '''
     Returns a dataframe containing annualized returns, annualized volatility, sharpe ratio, 
@@ -388,14 +387,7 @@ def summary_stats(s, risk_free_rate=0.03, periods_per_year=12, var_level=0.05):
             "Max Drawdown" : s.aggregate( lambda r: drawdown(r)["Drawdown"].min() )
         } 
         return pd.DataFrame(stats)
- 
-    
-    
-    
-    
-    
-    
-    
+     
 def optimal_weights(n_points, rets, covmatrix, periods_per_year):
     '''
     Returns a set of n_points optimal weights corresponding to portfolios (of the efficient frontier) 
@@ -485,3 +477,93 @@ def maximize_shape_ratio(rets, covmatrix, risk_free_rate, periods_per_year, targ
                       constraints = constr,
                       bounds = ((0.0,1.0),)*n_assets)
     return result.x
+
+def cppi(risky_rets, safe_rets=None, start_value=1000, floor=0.8, m=3, drawdown=0.02,
+         risk_free_rate=0.03, periods_per_year=12):
+    '''
+    Run a backtest of the CPPI investment strategy given a set of returns for a risky asset
+    Returns, account value history, risk budget history, and risky weight history
+    '''
+    
+    # compute the risky wealth (100% investment in the risky asset)
+    risky_wealth = start_value * (1 + risky_rets).cumprod()
+
+    # CPPI parameters
+    account_value = start_value
+    floor_value   = floor * account_value
+    
+    # Make the returns a DataFrame
+    if isinstance(risky_rets, pd.Series):
+        risky_rets = pd.DataFrame(risky_rets, columns="Risky return")
+    
+    # If returns of safe assets are not available just make artificial ones 
+    if safe_rets is None:
+        safe_rets = pd.DataFrame().reindex_like(risky_rets)
+        safe_rets[:] = risk_free_rate / periods_per_year
+    
+    # History dataframes
+    account_history = pd.DataFrame().reindex_like(risky_rets)
+    cushion_history = pd.DataFrame().reindex_like(risky_rets)
+    risky_w_history = pd.DataFrame().reindex_like(risky_rets)
+    
+    # Extra history dataframes in presence of drawdown
+    if drawdown is not None:
+        peak_history  = pd.DataFrame().reindex_like(risky_rets)
+        floor_history = pd.DataFrame().reindex_like(risky_rets)
+        peak = start_value
+        # define the multiplier 
+        m = 1 / drawdown
+    
+    # For loop over dates 
+    for step in range( len(risky_rets.index) ):
+        if drawdown is not None:
+            # current peak
+            peak = np.maximum(peak, account_value)
+            
+            # current floor value
+            floor_value = peak * (1 - drawdown)
+            floor_history.iloc[step] = floor_value
+        
+        # computing the cushion (as a percentage of the current account value)
+        cushion = (account_value - floor_value) / account_value
+    
+        # compute the weight for the allocation on the risky asset
+        risky_w = m * cushion
+        risky_w = np.minimum(risky_w, 1)
+        risky_w = np.maximum(risky_w, 0)
+        # the last two conditions ensure that the risky weight is in [0,1]
+    
+        # compute the weight for the allocation on the safe asset
+        safe_w  = 1 - risky_w
+
+        # compute the value allocation
+        risky_allocation = risky_w * account_value
+        safe_allocation  = safe_w  * account_value
+
+        # compute the new account value: this is given by the new values from both the risky and the safe assets
+        account_value = risky_allocation * (1 + risky_rets.iloc[step] ) + safe_allocation  * (1 + safe_rets.iloc[step]  )
+
+        # save data: current account value, cushions, weights
+        account_history.iloc[step] = account_value
+        cushion_history.iloc[step] = cushion 
+        risky_w_history.iloc[step] = risky_w
+    
+    # Given the CPPI wealth saved in the account_history, we can get back the CPPI returns
+    cppi_rets = ( account_history / account_history.shift(1) - 1 ).dropna()
+    
+    # Returning results
+    backtest_result = {
+        "Risky wealth"    : risky_wealth, 
+        "CPPI wealth"     : account_history, 
+        "CPPI returns"    : cppi_rets, 
+        "Cushions"        : cushion_history,
+        "Risky allocation": risky_w_history,
+        "Safe returns"    : safe_rets
+    }
+    if drawdown is not None:
+        backtest_result.update( {
+            "Floor value": floor_history,
+            "Peaks"      : peak_history
+        } )
+
+    return backtest_result
