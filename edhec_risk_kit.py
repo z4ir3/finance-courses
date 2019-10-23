@@ -562,7 +562,8 @@ def cppi(risky_rets, safe_rets=None, start_value=1000, floor=0.8, m=3, drawdown=
     if drawdown is not None:
         backtest_result.update({
             "Floor value": floor_history,
-            "Peaks"      : peak_history
+            "Peaks"      : peak_history,
+            "m"          : m
         })
 
     return backtest_result
