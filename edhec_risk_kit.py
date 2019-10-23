@@ -567,3 +567,54 @@ def cppi(risky_rets, safe_rets=None, start_value=1000, floor=0.8, m=3, drawdown=
         })
 
     return backtest_result
+
+
+
+def simulate_prices_and_rets(n_years=10, n_scenarios=20, mu=0.07, sigma=0.15, periods_per_year=12, start=100.0):
+    '''
+    Evolution of an initial stock price using Geometric Brownian Model:
+        dR_t/R_t = mu*dt + sigma*sqrt(dt)*xi,
+    where xi are normal random variable N(0,1). 
+    
+    Note that default periods_per_year=12 means that the method generates monthly prices (and returns):
+    change to 52 or 252 for weekly or daily prices and returns, respectively.
+    The method returns a dataframe of prices and the dataframe of returns.
+    '''
+    dt = 1 / periods_per_year
+    n_steps = int(n_years * periods_per_year)
+    
+    # from geometric brownian motion formula, returns have mean=mu*dt and std=sigma*sqrt(dt)
+    rets = pd.DataFrame( np.random.normal(loc=mu*dt, scale=sigma*(dt)**(0.5), size=(n_steps, n_scenarios)) )
+    
+    # compute prices from generated returns
+    prices = start*(1 + rets).cumprod()
+    prices = insert_first_row_df(prices, start)
+    
+    return prices, rets
+
+
+
+
+
+
+def insert_first_row_df(df, row):
+    '''
+    The method inserts a row at the beginning of a given dataframe and shift by one existing rows.
+    The input row has to be either a single element (in case of 1-column dataframe) or 
+    a dictionary in case of multi-column dataframe.
+    
+    Example:
+        df  = pd.DataFrame([1, 2, 3])
+        row = 0.5
+        df  = insert_first_row_df(df, row)
+    Example:    
+        df  = pd.DataFrame([[1,2],[34,12]], columns=["A","B"])
+        row = {"A":-34, "B":443}
+        df  = insert_first_row_df(df, row)        
+    '''
+    df.loc[-1] = row
+    df.index = df.index + 1
+    return df.sort_index()
+
+
+
