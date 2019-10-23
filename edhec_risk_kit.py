@@ -570,7 +570,7 @@ def cppi(risky_rets, safe_rets=None, start_value=1000, floor=0.8, m=3, drawdown=
 
 
 
-def simulate_prices_and_rets(n_years=10, n_scenarios=20, mu=0.07, sigma=0.15, periods_per_year=12, start=100.0):
+def simulate_gbm(n_years=10, n_scenarios=20, mu=0.07, sigma=0.15, periods_per_year=12, start=100.0):
     '''
     Evolution of an initial stock price using Geometric Brownian Model:
         dR_t/R_t = mu*dt + sigma*sqrt(dt)*xi,
@@ -591,6 +591,24 @@ def simulate_prices_and_rets(n_years=10, n_scenarios=20, mu=0.07, sigma=0.15, pe
     prices = insert_first_row_df(prices, start)
     
     return prices, rets
+
+
+
+def show_gbm(n_years=10, n_scenarios=6, mu=0.1, sigma=0.15, periods_per_year=12, start=12):
+    '''
+
+    '''
+    prices, rets = simulate_gbm(n_years=n_years, n_scenarios=n_scenarios, mu=mu, sigma=sigma, periods_per_year=periods_per_year, start=start)
+    ax = prices.plot(figsize=(12,5), grid=True, legend=False, color="sandybrown", alpha=0.7, linewidth=2)
+    ax.axhline(y=start, ls=":", color="black")
+    if periods_per_year == 12:
+        xlab = "months"
+    elif periods_per_year == 52:
+        xlab = "weeks"
+    elif periods_per_year == 252:
+        xlab = "days"
+    ax.set_xlabel(xlab)
+    
 
 
 
