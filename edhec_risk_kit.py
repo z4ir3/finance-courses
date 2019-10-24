@@ -93,7 +93,6 @@ def compound_returns(s, start=100):
     else:
         raise TypeError("Expected pd.DataFrame or pd.Series")
         
-
 def compute_returns(s):
     '''
     Computes the returns (percentage change) of a Dataframe of Series. 
@@ -117,8 +116,7 @@ def compute_logreturns(s):
         return np.log( s / s.shift(1) )
     else:
         raise TypeError("Expected pd.DataFrame or pd.Series")
-        
-
+    
 def drawdown(rets: pd.Series, start=1000):
     '''
     Compute the drawdowns of an input pd.Series of returns. 
@@ -127,7 +125,7 @@ def drawdown(rets: pd.Series, start=1000):
     2. all previous peaks 
     3. the drawdowns
     '''
-    wealth_index   = compound_returns(rets, start=start)    #start * (1 + rets).cumprod()
+    wealth_index   = compound_returns(rets, start=start)
     previous_peaks = wealth_index.cummax()
     drawdowns      = (wealth_index - previous_peaks ) / previous_peaks
     df = pd.DataFrame({"Wealth": wealth_index, "Peaks": previous_peaks, "Drawdown": drawdowns} )
@@ -589,7 +587,6 @@ def cppi(risky_rets, safe_rets=None, start_value=1000, floor=0.8, m=3, drawdown=
     return backtest_result
 
 
-
 def simulate_gbm_from_returns(n_years=10, n_scenarios=20, mu=0.07, sigma=0.15, periods_per_year=12, start=100.0):
     '''
     Evolution of an initial stock price using Geometric Brownian Model:
@@ -608,7 +605,7 @@ def simulate_gbm_from_returns(n_years=10, n_scenarios=20, mu=0.07, sigma=0.15, p
     rets = pd.DataFrame( np.random.normal(loc=mu*dt, scale=sigma*(dt)**(0.5), size=(n_steps, n_scenarios)) )
     
     # compute prices by compound the generated returns
-    prices = start*(1 + rets).cumprod()
+    prices = compound_returns(rets, start=start)
     prices = insert_first_row_df(prices, start)
     
     return prices, rets
@@ -646,7 +643,8 @@ def show_gbm(n_years=10, n_scenarios=6, mu=0.1, sigma=0.15, periods_per_year=12,
     '''
 
     '''
-    prices, rets = simulate_gbm(n_years=n_years, n_scenarios=n_scenarios, mu=mu, sigma=sigma, periods_per_year=periods_per_year, start=start)
+    prices, rets = simulate_gbm_from_returns(n_years=n_years, n_scenarios=n_scenarios, 
+                                             mu=mu, sigma=sigma, periods_per_year=periods_per_year, start=start)
     ax = prices.plot(figsize=(12,5), grid=True, legend=False, color="sandybrown", alpha=0.7, linewidth=2)
     ax.axhline(y=start, ls=":", color="black")
     if periods_per_year == 12:
