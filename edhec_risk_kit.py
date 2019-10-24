@@ -586,7 +586,6 @@ def cppi(risky_rets, safe_rets=None, start_value=1000, floor=0.8, m=3, drawdown=
 
     return backtest_result
 
-
 def simulate_gbm_from_returns(n_years=10, n_scenarios=20, mu=0.07, sigma=0.15, periods_per_year=12, start=100.0):
     '''
     Evolution of an initial stock price using Geometric Brownian Model:
@@ -664,8 +663,8 @@ def show_cppi(n_years=10, n_scenarios=50, m=3, floor=0, mu=0.04, sigma=0.15,
     CPPI wealths at the end of the given period (n_year).
     '''
     # generate returs using geometric brownian motions 
-    _, risky_rets = simulate_gbm(n_years=n_years, n_scenarios=n_scenarios, mu=mu, sigma=sigma, 
-                                 periods_per_year=periods_per_year, start=start)
+    _, risky_rets = simulate_gbm_from_returns(n_years=n_years, n_scenarios=n_scenarios, mu=mu, sigma=sigma, 
+                                              periods_per_year=periods_per_year, start=start)
     
     # run the CPPI strategy with fixed floor (i.e., with no drawdown constraint)
     cppiw = cppi(risky_rets, start_value=start, floor=floor, m=m, drawdown=None, 
@@ -746,6 +745,3 @@ def insert_first_row_df(df, row):
     df.loc[-1] = row
     df.index = df.index + 1
     return df.sort_index()
-
-
-
