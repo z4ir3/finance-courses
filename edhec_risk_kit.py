@@ -98,6 +98,19 @@ def compute_returns(s):
         return s / s.shift(1) - 1
     else:
         raise TypeError("Expected pd.DataFrame or pd.Series")
+        
+
+def compute_logreturns(s):
+    '''
+    Computes the log-returns of a Dataframe of Series. 
+    In the former case, it computes the returns for every column (Series) by using pd.aggregate
+    '''
+    if isinstance(s, pd.DataFrame):
+        return s.aggregate( compute_logreturns )
+    elif isinstance(s, pd.Series):
+        return np.log( s / s.shift(1) )
+    else:
+        raise TypeError("Expected pd.DataFrame or pd.Series")
 
     
 def drawdown(returns: pd.Series, capital=1.0):
@@ -573,7 +586,7 @@ def cppi(risky_rets, safe_rets=None, start_value=1000, floor=0.8, m=3, drawdown=
 def simulate_gbm(n_years=10, n_scenarios=20, mu=0.07, sigma=0.15, periods_per_year=12, start=100.0):
     '''
     Evolution of an initial stock price using Geometric Brownian Model:
-        dR_t/R_t = mu*dt + sigma*sqrt(dt)*xi,
+        (S_{t+dt} - S_t)/S_t = mu*dt + sigma*sqrt(dt)*xi,
     where xi are normal random variable N(0,1). 
     
     Note that default periods_per_year=12 means that the method generates monthly prices (and returns):
