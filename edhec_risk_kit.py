@@ -610,7 +610,74 @@ def show_gbm(n_years=10, n_scenarios=6, mu=0.1, sigma=0.15, periods_per_year=12,
     ax.set_xlabel(xlab)
     
 
+def show_cppi(n_years=10, n_scenarios=50, m=3, floor=0, mu=0.04, sigma=0.15, 
+              risk_free_rate=0.03, periods_per_year=12, start=100, ymax=100):
+    '''
+    CPPI simulation using Brownian Motion generated returns with mean mu and std sigma. 
+    The method will plot the simulated CPPI wealths as well as an histogram of the
+    CPPI wealths at the end of the given period (n_year).
+    '''
+    # generate returs using geometric brownian motions 
+    _, risky_rets = simulate_gbm(n_years=n_years, n_scenarios=n_scenarios, mu=mu, sigma=sigma, 
+                                 periods_per_year=periods_per_year, start=start)
+    
+    # run the CPPI strategy with fixed floor (i.e., with no drawdown constraint)
+    cppiw = cppi(risky_rets, start_value=start, floor=floor, m=m, drawdown=None, 
+                 risk_free_rate=risk_free_rate, periods_per_year=periods_per_year )["CPPI wealth"]
 
+    # make sure that start price is included  
+    cols = [i for i in range(0,cppiw.shape[1])]
+    row = {}
+    for col in cols:
+        row[col] = start
+    cppiw = insert_first_row_df(cppiw, row)
+    
+    # Plot parameters
+    fig, (wealth_ax, hist_ax) = plt.subplots(figsize=(20,7), nrows=1,ncols=2,sharey=True, gridspec_kw={"width_ratios":[3,2]} )
+    plt.subplots_adjust(wspace=0.005)    
+    simclr   = "sandybrown"
+    floorclr = "red"
+    startclr = "black"
+    ymax = (cppiw.values.max() - start)/100*ymax + start
+    
+    # Plot the random walks
+    cppiw.plot(ax=wealth_ax, grid=True, legend=False, color=simclr, alpha=0.5, linewidth=2)
+    wealth_ax.axhline(y=start, ls=":", color=startclr)
+    wealth_ax.axhline(y=start*floor, ls=":", color=floorclr, linewidth=2)
+    if periods_per_year == 12:
+        xlab = "months"
+    elif periods_per_year == 52:
+        xlab = "weeks"
+    elif periods_per_year == 252:
+        xlab = "days"
+    wealth_ax.set_xlabel(xlab)
+    wealth_ax.set_ylim(top=ymax)
+    wealth_ax.set_title("CPPI wealths due to brownian motion generated returns", fontsize=14)
+    
+    # Plot the histogram
+    violations_per_scenarios = (cppiw < start*floor).sum() # number of CPPI wealth violations of the floor per each scenario
+    total_violations = violations_per_scenarios.sum()      # overall number of CPPI wealth violations during the entire period
+
+    terminal_wealth = cppiw.iloc[-1]                       # CPPI wealth at the end of the period
+    tw_mean      = terminal_wealth.mean()
+    tw_median    = terminal_wealth.median() 
+    failure_mask = np.less(terminal_wealth, start*floor)
+    n_failures   = failure_mask.sum()
+    p_fail       = n_failures / n_scenarios
+    e_shorfall   = np.dot(terminal_wealth - start*floor,failure_mask) / n_failures if n_failures > 0.0 else 0.0 
+    
+    terminal_wealth.hist(grid=False, ax=hist_ax, bins=50, ec="white", fc=simclr, orientation="horizontal")
+    hist_ax.axhline(y=start, ls=":", color=startclr)
+    hist_ax.axhline(y=start*floor, ls=":", color=floorclr, linewidth=2)
+    hist_ax.axhline(y=tw_mean, ls=":", color=simclr)
+    hist_ax.axhline(y=tw_median, ls=":", color=simclr)
+    hist_ax.annotate("Mean: ${:.2f}".format(tw_mean), xy=(0.5, 0.9), xycoords="axes fraction", fontsize=15)
+    hist_ax.annotate("Median: ${:.2f}".format(tw_mean), xy=(0.5, 0.85), xycoords="axes fraction", fontsize=15)
+    if floor > 0.0:
+        hist_ax.annotate("Violations (overall): {}".format(total_violations), xy=(0.5, 0.75), xycoords="axes fraction", fontsize=15)
+        hist_ax.annotate("Violations (end period): {} ({:.1f}%)".format(n_failures, p_fail*100), xy=(0.5, 0.7), xycoords="axes fraction", fontsize=15)
+        hist_ax.annotate("E(shortfall) (end period): ${:.2f}".format(e_shorfall), xy=(0.5, 0.65), xycoords="axes fraction", fontsize=15)
+    hist_ax.set_title("Histogram of the CPPI wealth at the end of the period", fontsize=14)
 
 
 
