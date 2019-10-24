@@ -81,9 +81,6 @@ def get_total_market_index_returns():
     return (ind_cap_weights * ind_rets).sum(axis=1)
 
 
-
-
-
 def compound_returns(s, start=100):
     '''
     Compound a Dataframe or Series of returns from an initial default value equal to 100.
@@ -96,8 +93,6 @@ def compound_returns(s, start=100):
     else:
         raise TypeError("Expected pd.DataFrame or pd.Series")
         
-
-
 
 def compute_returns(s):
     '''
@@ -124,16 +119,15 @@ def compute_logreturns(s):
         raise TypeError("Expected pd.DataFrame or pd.Series")
         
 
-
-    
-def drawdown(returns: pd.Series, capital=1.0):
+def drawdown(rets: pd.Series, start=1000):
     '''
-    Drawdown: takes in input the returns of an asset and returns a dataframe containing 
-    1. the associated wealth index (for an hypothetical investment of $1000) 
+    Compute the drawdowns of an input pd.Series of returns. 
+    The method returns a dataframe containing: 
+    1. the associated wealth index (for an hypothetical starting investment of $1000) 
     2. all previous peaks 
     3. the drawdowns
     '''
-    wealth_index   = capital * (1 + returns).cumprod()
+    wealth_index   = compound_returns(rets, start=start)    #start * (1 + rets).cumprod()
     previous_peaks = wealth_index.cummax()
     drawdowns      = (wealth_index - previous_peaks ) / previous_peaks
     df = pd.DataFrame({"Wealth": wealth_index, "Peaks": previous_peaks, "Drawdown": drawdowns} )
