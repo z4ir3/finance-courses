@@ -84,6 +84,18 @@ def get_total_market_index_returns():
 
 
 
+def compound_returns(s, start=100):
+    '''
+    Compound a Dataframe or Series of returns from an initial default value equal to 100.
+    In the former case, the method compounds the returns for every column (Series) by using pd.aggregate. 
+    '''
+    if isinstance(s, pd.DataFrame):
+        return s.aggregate( compound_returns, start=start )
+    elif isinstance(s, pd.Series):
+        return start * (1 + s).cumprod()
+    else:
+        raise TypeError("Expected pd.DataFrame or pd.Series")
+        
 
 
 
@@ -99,7 +111,6 @@ def compute_returns(s):
     else:
         raise TypeError("Expected pd.DataFrame or pd.Series")
         
-
 def compute_logreturns(s):
     '''
     Computes the log-returns of a Dataframe of Series. 
@@ -111,6 +122,8 @@ def compute_logreturns(s):
         return np.log( s / s.shift(1) )
     else:
         raise TypeError("Expected pd.DataFrame or pd.Series")
+        
+
 
     
 def drawdown(returns: pd.Series, capital=1.0):
@@ -583,12 +596,13 @@ def cppi(risky_rets, safe_rets=None, start_value=1000, floor=0.8, m=3, drawdown=
 
 
 
-def simulate_gbm(n_years=10, n_scenarios=20, mu=0.07, sigma=0.15, periods_per_year=12, start=100.0):
+def simulate_gbm_from_returns(n_years=10, n_scenarios=20, mu=0.07, sigma=0.15, periods_per_year=12, start=100.0):
     '''
     Evolution of an initial stock price using Geometric Brownian Model:
         (S_{t+dt} - S_t)/S_t = mu*dt + sigma*sqrt(dt)*xi,
     where xi are normal random variable N(0,1). 
-    
+    The equation for percentage returns above is used to generate returns and they are compounded 
+    in order to get the prices.    
     Note that default periods_per_year=12 means that the method generates monthly prices (and returns):
     change to 52 or 252 for weekly or daily prices and returns, respectively.
     The method returns a dataframe of prices and the dataframe of returns.
@@ -596,14 +610,41 @@ def simulate_gbm(n_years=10, n_scenarios=20, mu=0.07, sigma=0.15, periods_per_ye
     dt = 1 / periods_per_year
     n_steps = int(n_years * periods_per_year)
     
-    # from geometric brownian motion formula, returns have mean=mu*dt and std=sigma*sqrt(dt)
+    # from GBM equation for percentage returns, returns have mean = mu*dt and std = sigma*sqrt(dt)
     rets = pd.DataFrame( np.random.normal(loc=mu*dt, scale=sigma*(dt)**(0.5), size=(n_steps, n_scenarios)) )
     
-    # compute prices from generated returns
+    # compute prices by compound the generated returns
     prices = start*(1 + rets).cumprod()
     prices = insert_first_row_df(prices, start)
     
     return prices, rets
+
+def simulate_gbm_from_prices(n_years=10, n_scenarios=20, mu=0.07, sigma=0.15, periods_per_year=12, start=100.0):
+    '''
+    Evolution of an initial stock price using Geometric Brownian Model:
+        S_t = S_0 exp( (mu-sigma^2/2)*dt + sigma*sqrt(dt)*xi ), 
+    where xi are normal random variable N(0,1). 
+    The equation for (log-)returns above is used to generate the prices and then log-returns are 
+    computed by definition of log(S_{t+dt}/S_t). 
+    Note that default periods_per_year=12 means that the method generates monthly prices (and returns):
+    change to 52 or 252 for weekly or daily prices and returns, respectively.
+    The method returns a dataframe of prices and the dataframe of returns.
+    '''
+    dt = 1 / periods_per_year
+    n_steps = int(n_years * periods_per_year)
+    
+    # from GBM equation for log-prices:
+    prices_dt = np.exp( np.random.normal(loc=(mu - 0.5*sigma**2)*dt, scale=sigma*(dt**(0.5)), size=(n_steps, n_scenarios)) )
+    # equivalent (but faster) to: 
+    # prices_dt = np.exp( (mu - 0.5*sigma**2)*dt + sigma*np.random.normal(loc=0, scale=(dt)**(0.5), size=(n_steps, n_scenarios)) )    
+    prices = start * pd.DataFrame(prices_dt).cumprod()
+    prices = insert_first_row_df(prices, start)
+    
+    # compute log-returns from generated prices
+    rets = compute_logreturns(prices).dropna()
+    
+    return prices, rets
+
 
 
 
