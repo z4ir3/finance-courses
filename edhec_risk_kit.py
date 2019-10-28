@@ -742,6 +742,35 @@ def discount(t, r):
     
     
     
+    
+    
+    
+    
+    
+    
+def nominal2annual_rate(r, periods_per_year):
+    return (1 + r/periods_per_year)**periods_per_year - 1
+
+def nominal2annual_rate_gen(r):
+    return np.exp(r) - 1
+
+def annual2nomimal_rate(R, periods_per_year):
+    return periods_per_year * ( (1 + R)**(1/periods_per_year) - 1 )
+
+def annual2nomimal_rate_gen(R):
+    return np.log( 1 + R )     
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 def insert_first_row_df(df, row):
     '''
     The method inserts a row at the beginning of a given dataframe and shift by one existing rows.
