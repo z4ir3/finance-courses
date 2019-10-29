@@ -765,7 +765,57 @@ def annual2nomimal_rate_gen(R):
     
     
     
+def simulate_cir(n_years=10, n_scenarios=10, a=0.05, b=0.03, sigma=0.05, periods_per_year=12, r0=None):
+    '''
+    Evolution of (instantaneous) interest rates and corresponding zero-coupon bond using the CIR model:
+        dr_t = a*(b-r_t) + sigma*sqrt(r_t)*xi,
+    where xi are normal random variable N(0,1). 
+    The analytical solution for the zero-coupon bond price is also computed.
+    The method returns a dataframe of interest rate and zero-coupon bond prices
+    '''
+    if r0 is None:
+        # Assign the long-term mean interest rate as initial rate
+        r0 = b
+        
+    # Compute the price of a ZCB
+    def zcbprice(ttm,r,h):
+        A = ( ( 2*h*np.exp(0.5*(a+h)*ttm) ) / ( 2*h + (a+h)*(np.exp(h*ttm)-1) ) )**(2*a*b/(sigma**2))
+        B = ( 2*(np.exp(h*ttm)-1) ) / ( 2*h + (a+h)*(np.exp(h*ttm)-1) ) 
+        return A * np.exp(-B * r)
     
+    dt = 1 / periods_per_year
+    n_steps = int(n_years * periods_per_year) + 1
+    
+    # get the nominal (instantaneous) rate 
+    r0 = annual2nomimal_rate_gen(r0)
+    
+    # the schock is sqrt(dt)*xi_t, with xi_t being standard normal r.v.
+    shock = np.random.normal(loc=0, scale=(dt)**(0.5), size=(n_steps, n_scenarios))
+    
+    # Rates initialization
+    rates = np.zeros_like(shock)
+    rates[0] = r0 
+    
+    # Price initialization and parameters
+    zcb_prices = np.zeros_like(shock)
+    h = np.sqrt(a**2 + 2*sigma**2)
+    zcb_prices[0] = zcbprice(n_years,r0,h)
+
+    for step in range(1,n_steps):
+        # previous interest rate
+        r_t = rates[step-1]
+        
+        # Current (updated) interest rate: CIR equation
+        rates[step] = r_t + a*(b - r_t) + sigma*np.sqrt(r_t)*shock[step]
+        
+        # Current (updated) ZCB price
+        zcb_prices[step] = zcbprice(n_years - dt*step, r_t, h)       
+ 
+    rates = pd.DataFrame( nominal2annual_rate_gen(rates) )
+    zcb_prices = pd.DataFrame( zcb_prices )
+
+    return rates, zcb_prices
+
     
     
     
