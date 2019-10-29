@@ -724,9 +724,6 @@ def show_cppi(n_years=10, n_scenarios=50, m=3, floor=0, mu=0.04, sigma=0.15,
         hist_ax.annotate("E(shortfall) (end period): ${:.2f}".format(e_shorfall), xy=(0.5, 0.65), xycoords="axes fraction", fontsize=15)
     hist_ax.set_title("Histogram of the CPPI wealth at the end of the period", fontsize=14)
 
-
-
-
 def discount(t, r):
     '''
     Compute the price of a pure discount bond that pays 1 at time t (year),
@@ -735,7 +732,17 @@ def discount(t, r):
     ''' 
     return 1 / (1 + r)**t
 
-    
+def present_value(L, r):
+    '''
+    Computes the (comulative) present value PV of a Series (or DataFrame) 
+    of liabilities L at a given interest rate r.
+    '''
+    if isinstance(L, pd.DataFrame):
+        return L.aggregate( present_value_2, r=r)
+    elif isinstance(L, pd.Series):
+        dates = L.index
+        discounts = erk.discount(dates, r)  # this is the series of present values of future cashflows
+        return np.dot( discounts, L )       # = (discounts * L).sum()    
     
     
     
