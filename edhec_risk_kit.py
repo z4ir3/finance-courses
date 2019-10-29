@@ -736,30 +736,30 @@ def discount(t: pd.Series, r):
     ''' 
     if not isinstance(r, list):
         r = [r]
-        
+    
     ds = []
     for rate in r: 
         ds.append( 1 / (1 + rate)**t )
         
     ds = pd.DataFrame(data=ds).T
     ds.index = t
-    
     return ds 
-
 
 def present_value(L: pd.DataFrame, r):
     '''
-    Computes the (comulative) present value PV of a DataFrame
+    Computes the (cumulative) present value PV of a DataFrame
     of liabilities L at a given interest rate r.
     '''
     dates = pd.Series(L.index)
     discounts = discount(dates, r)  # this is the series of present values of future cashflows
     return (discounts * L).sum()
     
-    
-    
-    
-    
+def funding_ratio(asset_value, liabilities, r):
+    '''
+    Computes the funding ratio between the value of holding assets and the present 
+    value of the liabilities given an interest rate r (or a list of)
+    '''
+    return asset_value / present_value(liabilities, r)   
     
     
     
