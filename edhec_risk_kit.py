@@ -729,11 +729,9 @@ def show_cppi(n_years=10, n_scenarios=50, m=3, floor=0, mu=0.04, sigma=0.15,
 
 def discount(t, r):
     '''
-    Compute the price of a pure discount bond that pays 1 at time t (year)
-    given an interest rate (or return) r. 
-    That is, considering a FV = 1 at time t, want to obtain the PV given r.
-    Hence:
-        PV = FV / (1+r)^t  gives  PV = 1/(1+r)^t
+    Compute the price of a pure discount bond that pays 1 at time t (year),
+    given an interest rate (return) r. That is, considering FV = 1 at time t, 
+    want to obtain the PV given r, i.e., PV = FV/(1+r)^t = 1/(1+r)^t.
     ''' 
     return 1 / (1 + r)**t
 
