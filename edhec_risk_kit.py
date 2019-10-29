@@ -745,11 +745,15 @@ def discount(t: pd.Series, r):
     ds.index = t
     return ds 
 
-def present_value(L: pd.DataFrame, r):
+def present_value(L, r):
     '''
     Computes the (cumulative) present value PV of a DataFrame
-    of liabilities L at a given interest rate r.
+    of liabilities L at a given interest rate r. 
+    Liabilities L hasto be a pd.DataFrame
     '''
+    if not isinstance(L, pd.DataFrame):
+        raise TypeError("Expected pd.DataFrame")
+
     dates = pd.Series(L.index)
     discounts = discount(dates, r)  # this is the series of present values of future cashflows
     return (discounts * L).sum()
