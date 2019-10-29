@@ -724,27 +724,37 @@ def show_cppi(n_years=10, n_scenarios=50, m=3, floor=0, mu=0.04, sigma=0.15,
         hist_ax.annotate("E(shortfall) (end period): ${:.2f}".format(e_shorfall), xy=(0.5, 0.65), xycoords="axes fraction", fontsize=15)
     hist_ax.set_title("Histogram of the CPPI wealth at the end of the period", fontsize=14)
 
-def discount(t, r):
+
+    
+
+def discount(t: pd.Series, r):
     '''
     Compute the price of a pure discount bond that pays 1 at time t (year),
     given an interest rate (return) r. That is, considering FV = 1 at time t, 
     want to obtain the PV given r, i.e., PV = FV/(1+r)^t = 1/(1+r)^t.
+    Note that t has to be a pd.Series of times.
     ''' 
-    return 1 / (1 + r)**t
+    if not isinstance(r, list):
+        r = [r]
+        
+    ds = []
+    for rate in r: 
+        ds.append( 1 / (1 + rate)**t )
+        
+    ds = pd.DataFrame(data=ds).T
+    ds.index = t
+    
+    return ds 
 
-def present_value(L, r):
+
+def present_value(L: pd.DataFrame, r):
     '''
-    Computes the (comulative) present value PV of a Series (or DataFrame) 
+    Computes the (comulative) present value PV of a DataFrame
     of liabilities L at a given interest rate r.
     '''
-    if isinstance(L, pd.DataFrame):
-        return L.aggregate( present_value_2, r=r)
-    elif isinstance(L, pd.Series):
-        dates = L.index
-        discounts = erk.discount(dates, r)  # this is the series of present values of future cashflows
-        return np.dot( discounts, L )       # = (discounts * L).sum()    
-    
-    
+    dates = pd.Series(L.index)
+    discounts = discount(dates, r)  # this is the series of present values of future cashflows
+    return (discounts * L).sum()
     
     
     
