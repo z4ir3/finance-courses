@@ -765,24 +765,17 @@ def funding_ratio(asset_value, liabilities, r):
     '''
     return asset_value / present_value(liabilities, r)   
     
-    
-    
 def nominal2annual_rate(r, periods_per_year):
     return (1 + r/periods_per_year)**periods_per_year - 1
 
 def nominal2annual_rate_gen(r):
     return np.exp(r) - 1
 
-def annual2nomimal_rate(R, periods_per_year):
+def annual2nominal_rate(R, periods_per_year):
     return periods_per_year * ( (1 + R)**(1/periods_per_year) - 1 )
 
-def annual2nomimal_rate_gen(R):
+def annual2nominal_rate_gen(R):
     return np.log( 1 + R )     
-    
-    
-    
-    
-    
     
 def simulate_cir(n_years=10, n_scenarios=10, a=0.05, b=0.03, sigma=0.05, periods_per_year=12, r0=None):
     '''
@@ -806,7 +799,7 @@ def simulate_cir(n_years=10, n_scenarios=10, a=0.05, b=0.03, sigma=0.05, periods
     n_steps = int(n_years * periods_per_year) + 1
     
     # get the nominal (instantaneous) rate 
-    r0 = annual2nomimal_rate_gen(r0)
+    r0 = annual2nominal_rate_gen(r0)
     
     # the schock is sqrt(dt)*xi_t, with xi_t being standard normal r.v.
     shock = np.random.normal(loc=0, scale=(dt)**(0.5), size=(n_steps, n_scenarios))
