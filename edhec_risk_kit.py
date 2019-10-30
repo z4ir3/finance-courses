@@ -724,9 +724,6 @@ def show_cppi(n_years=10, n_scenarios=50, m=3, floor=0, mu=0.04, sigma=0.15,
         hist_ax.annotate("E(shortfall) (end period): ${:.2f}".format(e_shorfall), xy=(0.5, 0.65), xycoords="axes fraction", fontsize=15)
     hist_ax.set_title("Histogram of the CPPI wealth at the end of the period", fontsize=14)
 
-
-    
-
 def discount(t, r):
     '''
     Compute the price of a pure discount bond that pays 1 at time t (year),
@@ -832,7 +829,7 @@ def simulate_cir(n_years=10, n_scenarios=10, a=0.05, b=0.03, sigma=0.05, periods
 
     return rates, zcb_prices
 
-def bond_cash_flows(maturity=10, principal=100, coupon_rate=0.03, coupons_per_year=2):
+def bond_cash_flows(principal=100, maturity=10, coupon_rate=0.03, coupons_per_year=2):
     '''
     Generates a pd.Series of cash flows of a regular bond. Note that:
     '''
@@ -848,7 +845,7 @@ def bond_cash_flows(maturity=10, principal=100, coupon_rate=0.03, coupons_per_ye
         
     return cash_flows
     
-def bond_price(maturity=10, principal=100, coupon_rate=0.03, coupons_per_year=2, discount_rate=0.05):
+def bond_price(principal=100, maturity=10, coupon_rate=0.03, ytm=0.05, coupons_per_year=2):
     '''
     Return the price of a regular paying-coupons bond. 
     Note that:
@@ -856,11 +853,32 @@ def bond_price(maturity=10, principal=100, coupon_rate=0.03, coupons_per_year=2,
     - the principal (face value) simply corresponds to the capital invested in the bond;
     - the coupon_rate is an annual rate;
     - the coupons_per_year is the number of coupons paid every year;
-    - the discount rate divided by coupons_per_year is nothing but that the yield to maturity of the bond.
+    - the ytm is the yield to maturity: then ytm divided by coupons_per_year gives the discount rate of cash flows
     '''
     cash_flows = bond_cash_flows(maturity=maturity, principal=principal, coupon_rate=coupon_rate, coupons_per_year=coupons_per_year)    
-    bond_price = erk.present_value(cash_flows, discount_rate/coupons_per_year)
+    bond_price = present_value(cash_flows, ytm/coupons_per_year)
     return bond_price
+
+def mac_duration(cash_flows, discount_rate):
+    '''
+    Macaulay duration of an asset involving of regular cash flows such as a bond
+    '''
+    times = cash_flows.index
+    
+    # discount rates of signle cash flows
+    discounts_cash_flows_rate = discount( times, discount_rate )
+    
+    # present value of single cash flows (discounted cash flows)
+    discount_cf = discounts_cash_flows_rate * cash_flows
+    
+    # present value of entire payment 
+    pv_cash_flows = discount_cf.sum()
+    
+    # weights
+    weights = (discount_cf / pv_cash_flows).values
+    
+    # cannot make weights*cf.index as weights a dataframe while times is a series
+    return np.sum( [w*t for w,t in zip(weights,times)] )
 
     
     
