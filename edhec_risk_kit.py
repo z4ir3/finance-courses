@@ -727,13 +727,16 @@ def show_cppi(n_years=10, n_scenarios=50, m=3, floor=0, mu=0.04, sigma=0.15,
 
     
 
-def discount(t: pd.Series, r):
+def discount(t, r):
     '''
     Compute the price of a pure discount bond that pays 1 at time t (year),
     given an interest rate (return) r. That is, considering FV = 1 at time t, 
     want to obtain the PV given r, i.e., PV = FV/(1+r)^t = 1/(1+r)^t.
     Note that t has to be a pd.Series of times.
     ''' 
+    if not isinstance(t, pd.Series):
+        t = pd.Series(t)
+        
     if not isinstance(r, list):
         r = [r]
     
@@ -823,6 +826,7 @@ def simulate_cir(n_years=10, n_scenarios=10, a=0.05, b=0.03, sigma=0.05, periods
         # Current (updated) ZCB price
         zcb_prices[step] = zcbprice(n_years - dt*step, r_t, h)       
  
+    # the rates generated (according to the periods_per_year) are transformed back to annual rates
     rates = pd.DataFrame( nominal2annual_rate_gen(rates) )
     zcb_prices = pd.DataFrame( zcb_prices )
 
