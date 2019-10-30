@@ -759,7 +759,7 @@ def present_value(L, r):
 
     dates = pd.Series(L.index)    
     ds = discount(dates, r)  # this is the series of present values of future cashflows
-    return (ds.values * L.values).sum()
+    return (ds * L).sum()
     
 def funding_ratio(asset_value, liabilities, r):
     '''
@@ -831,6 +831,36 @@ def simulate_cir(n_years=10, n_scenarios=10, a=0.05, b=0.03, sigma=0.05, periods
     zcb_prices = pd.DataFrame( zcb_prices )
 
     return rates, zcb_prices
+
+def bond_cash_flows(maturity=10, principal=100, coupon_rate=0.03, coupons_per_year=2):
+    '''
+    Generates a pd.Series of cash flows of a regular bond. Note that:
+    '''
+    # total number of coupons 
+    n_coupons = round(maturity * coupons_per_year)
+    
+    # coupon amount 
+    coupon_amount = (coupon_rate / coupons_per_year) * principal 
+    
+    # Cash flows
+    cash_flows = pd.DataFrame(coupon_amount, index = np.arange(1,n_coupons+1), columns=[0])
+    cash_flows.iloc[-1] = cash_flows.iloc[-1] + principal 
+        
+    return cash_flows
+    
+def bond_price(maturity=10, principal=100, coupon_rate=0.03, coupons_per_year=2, discount_rate=0.05):
+    '''
+    Return the price of a regular paying-coupons bond. 
+    Note that:
+    - the maturity is intended as an annual variable (e.g., for a 6-months bond maturity is 0.5);
+    - the principal (face value) simply corresponds to the capital invested in the bond;
+    - the coupon_rate is an annual rate;
+    - the coupons_per_year is the number of coupons paid every year;
+    - the discount rate divided by coupons_per_year is nothing but that the yield to maturity of the bond.
+    '''
+    cash_flows = bond_cash_flows(maturity=maturity, principal=principal, coupon_rate=coupon_rate, coupons_per_year=coupons_per_year)    
+    bond_price = erk.present_value(cash_flows, discount_rate/coupons_per_year)
+    return bond_price
 
     
     
