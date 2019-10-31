@@ -865,22 +865,14 @@ def mac_duration(cash_flows, discount_rate):
     '''
     times = cash_flows.index
     
-    # discount rates of signle cash flows
-    discounts_cash_flows_rate = discount( times, discount_rate )
-    
     # present value of single cash flows (discounted cash flows)
-    discount_cf = discounts_cash_flows_rate * cash_flows
-    
-    # present value of entire payment 
-    pv_cash_flows = discount_cf.sum()
-    
-    # weights
-    weights = (discount_cf / pv_cash_flows).values
+    discount_cf = erk.discount( times, discount_rate ) * cash_flows
+        
+    # weights: the present value of the entire payment, i.e., discount_cf.sum() is equal to the principal 
+    weights = (discount_cf / discount_cf.sum()).values
     
     # cannot make weights*cf.index as weights a dataframe while times is a series
     return np.sum( [w*t for w,t in zip(weights,times)] )
-
-    
     
     
     
