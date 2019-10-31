@@ -845,7 +845,7 @@ def bond_cash_flows(principal=100, maturity=10, coupon_rate=0.03, coupons_per_ye
         
     return cash_flows
     
-def bond_price(principal=100, maturity=10, coupon_rate=0.03, ytm=0.05, coupons_per_year=2):
+def bond_price(principal=100, maturity=10, coupon_rate=0.03, ytm=0.05, coupons_per_year=2, cf=None):
     '''
     Return the price of a regular paying-coupons bond. 
     Note that:
@@ -854,9 +854,13 @@ def bond_price(principal=100, maturity=10, coupon_rate=0.03, ytm=0.05, coupons_p
     - the coupon_rate is an annual rate;
     - the coupons_per_year is the number of coupons paid every year;
     - the ytm is the yield to maturity: then ytm divided by coupons_per_year gives the discount rate of cash flows
+    In case a flux of cash flows is given because computed beforehand, the method simply computes 
+    the bond price without recomputing the cash flows: in this case, only ytm and coupons_per_year 
+    must be given together with cf.
     '''
-    cash_flows = bond_cash_flows(maturity=maturity, principal=principal, coupon_rate=coupon_rate, coupons_per_year=coupons_per_year)    
-    bond_price = present_value(cash_flows, ytm/coupons_per_year)
+    if cf is None:
+        cf = bond_cash_flows(maturity=maturity, principal=principal, coupon_rate=coupon_rate, coupons_per_year=coupons_per_year)    
+    bond_price = present_value(cf, ytm/coupons_per_year)
     return bond_price
 
 def mac_duration(cash_flows, discount_rate):
@@ -866,7 +870,7 @@ def mac_duration(cash_flows, discount_rate):
     times = cash_flows.index
     
     # present value of single cash flows (discounted cash flows)
-    discount_cf = erk.discount( times, discount_rate ) * cash_flows
+    discount_cf = discount( times, discount_rate ) * cash_flows
         
     # weights: the present value of the entire payment, i.e., discount_cf.sum() is equal to the principal 
     weights = (discount_cf / discount_cf.sum()).values
