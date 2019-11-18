@@ -808,6 +808,8 @@ def funding_ratio(asset_value, liabilities, r):
     '''
     return asset_value / present_value(liabilities, r)   
     
+    
+    
 def nominal2annual_rate(r, periods_per_year):
     return (1 + r/periods_per_year)**periods_per_year - 1
 
@@ -819,7 +821,38 @@ def annual2nominal_rate(R, periods_per_year):
 
 def annual2nominal_rate_gen(R):
     return np.log( 1 + R )     
+
+
+
+
+def compounding_rate(r, periods_per_year=None):
+    '''
+    Given a nominal rate r, it returns the continuously compounded rate R = e^r - 1 if periods_per_year is None.
+    If periods_per_year is not None, then returns the discrete compounded rate R = (1+r/N)**N-1.
+    '''
+    if periods_per_year is None:
+        return np.exp(r) - 1
+    else:
+        return (1 + r/periods_per_year)**periods_per_year - 1
     
+def compounding_rate_inv(R, periods_per_year=None):
+    '''
+    Given a compounded rate, it returns the nominal rate from continuously compounding 
+    r = log(1+R) if periods_per_year is None.
+    If periods_per_year is not None, then returns the nominal rate from discrete 
+    compounding r = N*((1+R)^1/N-1).
+    '''
+    if periods_per_year is None:
+        return np.log(1+R)
+    else:
+        return periods_per_year * ( (1+R)**(1/periods_per_year) - 1 )
+
+
+
+
+
+
+
 def simulate_cir(n_years=10, n_scenarios=10, a=0.05, b=0.03, sigma=0.05, periods_per_year=12, r0=None):
     '''
     Evolution of (instantaneous) interest rates and corresponding zero-coupon bond using the CIR model:
@@ -842,7 +875,7 @@ def simulate_cir(n_years=10, n_scenarios=10, a=0.05, b=0.03, sigma=0.05, periods
     n_steps = int(n_years * periods_per_year) + 1
     
     # get the nominal (instantaneous) rate 
-    r0 = annual2nominal_rate_gen(r0)
+    r0 = compounding_rate_inv(r0)    #annual2nominal_rate_gen(r0)
     
     # the schock is sqrt(dt)*xi_t, with xi_t being standard normal r.v.
     shock = np.random.normal(loc=0, scale=(dt)**(0.5), size=(n_steps, n_scenarios))
@@ -867,7 +900,7 @@ def simulate_cir(n_years=10, n_scenarios=10, a=0.05, b=0.03, sigma=0.05, periods
         zcb_prices[step] = zcbprice(n_years - dt*step, r_t, h)       
  
     # the rates generated (according to the periods_per_year) are transformed back to annual rates
-    rates = pd.DataFrame( nominal2annual_rate_gen(rates) )
+    rates = pd.DataFrame( compounding_rate(rates) )       #nominal2annual_rate_gen(rates) )
     zcb_prices = pd.DataFrame( zcb_prices )
 
     return rates, zcb_prices
