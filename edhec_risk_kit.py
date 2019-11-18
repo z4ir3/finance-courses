@@ -293,8 +293,6 @@ def portfolio_volatility(weights, cov_rets):
     '''
     return ( np.dot(weights.T, np.dot(cov_rets, weights)) )**(0.5) 
 
-
-
 def efficient_frontier(n_portfolios, rets, covmat, periods_per_year, risk_free_rate=0.0, 
                        iplot=False, hsr=False, cml=False, mvp=False, ewp=False):
     '''
@@ -448,6 +446,51 @@ def minimize_volatility(rets, covmatrix, target_return=None):
                       options = {"disp": False},
                       constraints = constr,
                       bounds = ((0.0,1.0),)*n_assets ) # bounds of each individual weight, i.e., w between 0 and 1
+    return result.x
+
+def minimize_volatility_2(rets, covmatrix, target_return=None, weights_norm_const=True, weights_bound_const=True):
+    '''
+    Returns the optimal weights of the minimum volatility portfolio.
+    If target_return is not None, then the weights correspond to the minimum volatility portfolio 
+    having a fixed target return (such portfolio will be on the efficient frontier).
+    The variables weights_norm_const and weights_bound_const impose two more conditions, the firt one on 
+    weight that sum to 1, and the latter on the weights which have to be between zero and 1
+    The method uses the scipy minimize optimizer which solves the minimization problem 
+    for the volatility of the portfolio
+    '''
+    n_assets = rets.shape[0]    
+    
+    # initial guess weights
+    init_guess = np.repeat(1/n_assets, n_assets)
+    
+    if weights_bound_const:
+        # bounds of the weights (between 0 and 1)
+        bounds = ((0.0,1.0),)*n_assets
+    else:
+        bounds = None
+    
+    constraints = []
+    if weights_norm_const:
+        weights_constraint = {
+            "type": "eq",
+            "fun": lambda w: 1.0 - np.sum(w)  
+        }
+        constraints.append( weights_constraint )    
+    if target_return is not None:
+        return_constraint = {
+            "type": "eq",
+            "args": (rets,),
+            "fun": lambda w, r: target_return - portfolio_return(w, r)
+        }
+        constraints.append( return_constraint )
+    
+    result = minimize(portfolio_volatility, 
+                      init_guess,
+                      args = (covmatrix,),
+                      method = "SLSQP",
+                      options = {"disp": False},
+                      constraints = tuple(constraints),
+                      bounds = bounds)
     return result.x
 
 def maximize_shape_ratio(rets, covmatrix, risk_free_rate, periods_per_year, target_volatility=None):
