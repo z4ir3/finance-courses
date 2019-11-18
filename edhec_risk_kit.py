@@ -779,14 +779,10 @@ def discount(t, r):
         
     if not isinstance(r, list):
         r = [r]
-    
-    ds = []
-    for rate in r: 
-        ds.append( 1 / (1 + rate)**t )
         
-    ds = pd.DataFrame(data=ds).T
+    ds = pd.DataFrame( [1/(1+rate)**(t) for rate in r] ).T
     ds.index = t
-    return ds 
+    return ds
 
 def present_value(L, r):
     '''
@@ -808,23 +804,6 @@ def funding_ratio(asset_value, liabilities, r):
     '''
     return asset_value / present_value(liabilities, r)   
     
-    
-    
-def nominal2annual_rate(r, periods_per_year):
-    return (1 + r/periods_per_year)**periods_per_year - 1
-
-def nominal2annual_rate_gen(r):
-    return np.exp(r) - 1
-
-def annual2nominal_rate(R, periods_per_year):
-    return periods_per_year * ( (1 + R)**(1/periods_per_year) - 1 )
-
-def annual2nominal_rate_gen(R):
-    return np.log( 1 + R )     
-
-
-
-
 def compounding_rate(r, periods_per_year=None):
     '''
     Given a nominal rate r, it returns the continuously compounded rate R = e^r - 1 if periods_per_year is None.
@@ -846,12 +825,6 @@ def compounding_rate_inv(R, periods_per_year=None):
         return np.log(1+R)
     else:
         return periods_per_year * ( (1+R)**(1/periods_per_year) - 1 )
-
-
-
-
-
-
 
 def simulate_cir(n_years=10, n_scenarios=10, a=0.05, b=0.03, sigma=0.05, periods_per_year=12, r0=None):
     '''
@@ -943,6 +916,10 @@ def mac_duration(cash_flows, discount_rate):
     '''
     Macaulay duration of an asset involving of regular cash flows such as a bond
     '''
+    if not isinstance(cash_flows,pd.DataFrame):
+        cash_flows = pd.DataFrame(cash_flows)
+        cash_flows.columns = [0]
+    
     times = cash_flows.index
     
     # present value of single cash flows (discounted cash flows)
