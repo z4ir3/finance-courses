@@ -894,36 +894,7 @@ def bond_cash_flows(principal=100, maturity=10, coupon_rate=0.03, coupons_per_ye
         
     return cash_flows
     
-def bond_price(principal=100, maturity=10, coupon_rate=0.03, ytm=0.05, coupons_per_year=2, cf=None):
-    '''
-    Return the price of a regular paying-coupons bond. 
-    Note that:
-    - the maturity is intended as an annual variable (e.g., for a 6-months bond maturity is 0.5);
-    - the principal (face value) simply corresponds to the capital invested in the bond;
-    - the coupon_rate is an annual rate;
-    - the coupons_per_year is the number of coupons paid every year;
-    - the ytm is the yield to maturity: then ytm divided by coupons_per_year gives the discount rate of cash flows
-    In case a flux of cash flows is given because computed beforehand, the method simply computes 
-    the bond price without recomputing the cash flows: in this case, only ytm and coupons_per_year 
-    must be given together with cf.
-    '''
-    if cf is None:
-        cf = bond_cash_flows(maturity=maturity, principal=principal, coupon_rate=coupon_rate, coupons_per_year=coupons_per_year)    
-    bond_price = present_value(cf, ytm/coupons_per_year)
-    return bond_price
-
-
-
-
-
-
-
-
-
-
-
-
-def bond_price_2(principal=100, maturity=10, coupon_rate=0.02, coupons_per_year=2, ytm=0.03, cf=None):
+def bond_price(principal=100, maturity=10, coupon_rate=0.02, coupons_per_year=2, ytm=0.03, cf=None):
     '''
     Return the price of regular coupon-bearing bonds
     Note that:
@@ -971,12 +942,26 @@ def bond_price_2(principal=100, maturity=10, coupon_rate=0.02, coupons_per_year=
         return single_price_bond(principal=principal, maturity=maturity, coupon_rate=coupon_rate, 
                                  coupons_per_year=coupons_per_year, ytm=ytm, cf=cf)        
 
-
-
-
-
-
-
+def bond_returns(principal, bond_prices, coupon_rate, coupons_per_year, periods_per_year, maturity=None):
+    '''
+    Computes the total return of a coupon-paying bond. 
+    The bond_prices can be a pd.DataFrame of bond prices for different ytms and scenarios 
+    as well as a single bond price for a fixed ytm. 
+    In the first case, remind to annualize the computed returns.
+    In the latter case, the maturity of the bond has to passed since cash-flows needs to be recovered. 
+    Moreover, the computed return does not have to be annualized.
+    '''
+    if isinstance(bond_prices, pd.DataFrame):
+        coupons = pd.DataFrame(data=0, index=bond_prices.index, columns=bond_prices.columns)
+        last_date = bond_prices.index.max()
+        pay_date = np.linspace(periods_per_year/coupons_per_year, last_date, int(coupons_per_year*last_date/periods_per_year), dtype=int  )
+        coupons.iloc[pay_date] = principal*coupon_rate/coupons_per_year
+        tot_return = (bond_prices + coupons)/bond_prices.shift(1) - 1 
+        return tot_return.dropna()
+    else:
+        cf = bond_cash_flows(principal=principal, maturity=maturity, coupon_rate=coupon_rate, coupons_per_year=coupons_per_year) 
+        tot_return = ( cf.sum() / bond_prices )**(1/maturity) - 1
+        return tot_return[0]
 
 def mac_duration(cash_flows, discount_rate):
     '''
