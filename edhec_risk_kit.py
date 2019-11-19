@@ -848,7 +848,7 @@ def simulate_cir(n_years=10, n_scenarios=10, a=0.05, b=0.03, sigma=0.05, periods
     n_steps = int(n_years * periods_per_year) + 1
     
     # get the nominal (instantaneous) rate 
-    r0 = compounding_rate_inv(r0)    #annual2nominal_rate_gen(r0)
+    r0 = compounding_rate_inv(r0)
     
     # the schock is sqrt(dt)*xi_t, with xi_t being standard normal r.v.
     shock = np.random.normal(loc=0, scale=(dt)**(0.5), size=(n_steps, n_scenarios))
@@ -873,7 +873,7 @@ def simulate_cir(n_years=10, n_scenarios=10, a=0.05, b=0.03, sigma=0.05, periods
         zcb_prices[step] = zcbprice(n_years - dt*step, r_t, h)       
  
     # the rates generated (according to the periods_per_year) are transformed back to annual rates
-    rates = pd.DataFrame( compounding_rate(rates) )       #nominal2annual_rate_gen(rates) )
+    rates = pd.DataFrame( compounding_rate(rates) )
     zcb_prices = pd.DataFrame( zcb_prices )
 
     return rates, zcb_prices
@@ -912,6 +912,72 @@ def bond_price(principal=100, maturity=10, coupon_rate=0.03, ytm=0.05, coupons_p
     bond_price = present_value(cf, ytm/coupons_per_year)
     return bond_price
 
+
+
+
+
+
+
+
+
+
+
+
+def bond_price_2(principal=100, maturity=10, coupon_rate=0.02, coupons_per_year=2, ytm=0.03, cf=None):
+    '''
+    Return the price of regular coupon-bearing bonds
+    Note that:
+    - the maturity is intended as an annual variable (e.g., for a 6-months bond, maturity is 0.5);
+    - the principal (face value) simply corresponds to the capital invested in the bond;
+    - the coupon_rate has to be an annual rate;
+    - the coupons_per_year is the number of coupons paid per year;
+    - the ytm is the yield to maturity: then ytm divided by coupons_per_year gives the discount rate of cash flows
+    The ytm variable can be both a single value and a pd.DataFrame. 
+    In the former case, a single bond price is computed. In addition, if the flux of cash flows is computed beforehand, 
+    the method can takes it as input and avoid recomputing it.
+    In the latter case, the dataframe is intended as a t-by-scenarios matrix, where t are the dates and scenarios denotes
+    the number of rates scenario in input. Here, for each scenario, single bond prices are computed according to different ytms.
+    '''
+    # single bond price 
+    def single_price_bond(principal=principal, maturity=maturity, coupon_rate=coupon_rate, coupons_per_year=coupons_per_year, ytm=ytm, cf=cf):
+        if cf is None:            
+            # compute the bond cash flow on the fly
+            cf = bond_cash_flows(maturity=maturity, principal=principal, coupon_rate=coupon_rate, coupons_per_year=coupons_per_year) 
+        bond_price = present_value(cf, ytm/coupons_per_year)[0]
+        return bond_price
+    
+    if isinstance(ytm,pd.Series):
+        raise TypeError("Expected pd.DataFrame or a single value for ytm")
+
+    if isinstance(ytm,pd.DataFrame):
+        # ytm is a dataframe of rates for different scenarios 
+        n_scenarios = ytm.shape[1]
+        bond_price  = pd.DataFrame()
+        # we have a for over each scenarios of rates (ytms)
+        for i in range(n_scenarios):
+            # for each scenario, a list comprehension computes bond prices according to ytms up to time maturity minus 1
+            prices = [single_price_bond(principal=principal, maturity=maturity - t/coupons_per_year, coupon_rate=coupon_rate,
+                                        coupons_per_year=coupons_per_year, ytm=y, cf=cf) for t, y in zip(ytm.index[:-1], ytm.iloc[:-1,i]) ] 
+            bond_price = pd.concat([bond_price, pd.DataFrame(prices)], axis=1)
+        # rename columns with scenarios
+        bond_price.columns = ytm.columns
+        # concatenate one last row with bond prices at maturity for each scenario
+        bond_price = pd.concat([ bond_price, 
+                                 pd.DataFrame( [[principal+principal*coupon_rate/coupons_per_year] * n_scenarios], index=[ytm.index[-1]]) ], 
+                                axis=0)
+        return bond_price 
+    else:
+        # base case: ytm is a value and a single bond price is computed 
+        return single_price_bond(principal=principal, maturity=maturity, coupon_rate=coupon_rate, 
+                                 coupons_per_year=coupons_per_year, ytm=ytm, cf=cf)        
+
+
+
+
+
+
+
+
 def mac_duration(cash_flows, discount_rate):
     '''
     Macaulay duration of an asset involving of regular cash flows such as a bond
@@ -930,9 +996,6 @@ def mac_duration(cash_flows, discount_rate):
     
     # cannot make weights*cf.index as weights a dataframe while times is a series
     return np.sum( [w*t for w,t in zip(weights,times)] )
-    
-    
-    
     
 def insert_first_row_df(df, row):
     '''
