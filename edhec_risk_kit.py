@@ -411,6 +411,31 @@ def summary_stats(s, risk_free_rate=0.03, periods_per_year=12, var_level=0.05):
             "Max Drawdown" : s.aggregate( lambda r: drawdown(r)["Drawdown"].min() )
         } 
         return pd.DataFrame(stats)
+    
+def summary_stats_terminal(rets, floor=0.8, periods_per_year=2, name="Stats", target=np.inf):
+    '''
+    Return a dataframe of statistics for a given input pd.DataFrame of asset returns. 
+    Statistics computed are:
+    - the mean annualized return
+    - the mean terminal wealth (compounded return)
+    - the mean terminal wealth volatility
+    - the probability that an input floor is breached by terminal wealths
+    - the expected shortfall of those terminal wealths breaching the input floor 
+    '''    
+    # terminal wealths over scenarios, i.e., compounded returns
+    terminal_wlt = terminal_wealth(rets)
+    
+    # boolean vector of terminal wealths going below the floor 
+    floor_breach = terminal_wlt < floor
+
+    stats = pd.DataFrame.from_dict({
+        "Mean ann. ret.":  annualize_rets(rets, periods_per_year=periods_per_year).mean(),              # mean annualized returns over scenarios
+        "Mean wealth":     terminal_wlt.mean(),                                                         # terminal wealths mean 
+        "Mean wealth std": terminal_wlt.std(),                                                          # terminal wealths volatility
+        "Prob breach":     floor_breach.mean() if floor_breach.sum() > 0 else 0,                        # probability of breaching the floor
+        "Exp shortfall":   (floor - terminal_wlt[floor_breach]).mean() if floor_breach.sum() > 0 else 0 # expected shortfall if floor is reached  
+    }, orient="index", columns=[name])
+    return stats
      
 def optimal_weights(n_points, rets, covmatrix, periods_per_year):
     '''
