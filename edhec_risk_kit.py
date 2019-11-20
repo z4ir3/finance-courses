@@ -1014,6 +1014,52 @@ def mac_duration(cash_flows, discount_rate):
     
     # cannot make weights*cf.index as weights a dataframe while times is a series
     return np.sum( [w*t for w,t in zip(weights,times)] )
+
+def ldi_mixer(r1, r2, allocator, **kwargs):
+    '''
+    Liability-Driven Investing strategy allocator. 
+    The method takes in input the returns of two assets (r1 and r2), 
+    the allocator, which is the name of the allocator method to be used and 
+    that return the weight in r1, and
+    other extra arguments which are used by the allocator.
+    The method returns a dataframe consisting of the weighted average 
+    of the returns.
+    '''
+    if not r1.shape == r2.shape:
+        # make sure shapes coincides
+        raise ValueError("Expected r1 and r2 to be the same shape")
+    
+    weights = allocator(r1, r2, **kwargs)
+    
+    if not weights.shape == r1.shape:
+        # make sure shapes coincides
+        raise ValueError("Weights shape does not match r1 (and r2) shape")
+        
+    return weights*r1 + (1-weights)*r2
+
+def ldi_glidepath_allocator(r1, r2, start=1, end=0):
+    '''
+    Glide path fixed-mix strategy allocation between two asset returns.
+    Here, r1 and r2 are the returns of the assets and w1 is the weight in r1.
+    The method returns a dataframe consisting of linearly spaced weights (in r1) 
+    from start to end, which have to be given in input. 
+    The method is called by the LDI_MIXER method.
+    '''
+    # allocating linearly spaced weigths from strat to end 
+    single_path = pd.DataFrame(data=np.linspace(start, end, num=r1.shape[0]))
+    paths = pd.concat( [single_path]*r1.shape[1], axis=1 )
+    paths.index   = r1.index
+    paths.columns = r1.columns
+    return paths
+
+def ldi_fixed_allocator(r1, r2, w1, **kwargs):
+    '''
+    Fixed-mix strategy allocation between two asset returns.
+    Here, r1 and r2 are the returns of the assets and w1 is the weight in r1.
+    The method returns a dataframe consisting of the weight w1.
+    The method is called by the LDI_MIXER method.
+    '''
+    return pd.DataFrame(data=w1, index=r1.index, columns=r1.columns)
     
 def insert_first_row_df(df, row):
     '''
