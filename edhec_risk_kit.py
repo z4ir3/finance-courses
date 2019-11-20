@@ -62,7 +62,6 @@ def get_ind_size():
     ind.columns = ind.columns.str.strip()
     return ind
 
-
 def get_total_market_index_returns():
     '''
     Computes the (total market) returns from the Ken French 30 Industry portfolio
@@ -80,6 +79,15 @@ def get_total_market_index_returns():
     # finally, computes the total market returns         
     return (ind_cap_weights * ind_rets).sum(axis=1)
 
+def terminal_wealth(s):
+    '''
+    Computes the terminal wealth of a sequence of return, which is, in other words, 
+    the final compounded return. 
+    The input s is expected to be either a pd.DataFrame or a pd.Series
+    '''
+    if not isinstance(s, (pd.DataFrame, pd.Series)):
+        raise ValueError("Expected either a pd.DataFrame or pd.Series")
+    return (1 + s).prod()
 
 def compound_returns(s, start=100):
     '''
@@ -392,7 +400,7 @@ def summary_stats(s, risk_free_rate=0.03, periods_per_year=12, var_level=0.05):
         return pd.DataFrame(stats, index=["0"])
     
     elif isinstance(s, pd.DataFrame):        
-        stats     = {
+        stats = {
             "Ann. return"  : s.aggregate( annualize_rets, periods_per_year=periods_per_year ),
             "Ann. vol"     : s.aggregate( annualize_vol,  periods_per_year=periods_per_year ),
             "Sharpe ratio" : s.aggregate( sharpe_ratio, risk_free_rate=risk_free_rate, periods_per_year=periods_per_year ),
