@@ -1031,7 +1031,7 @@ def ldi_mixer(psp_rets, lhp_rets, allocator, **kwargs):
     
     weights = allocator(psp_rets, lhp_rets, **kwargs)
     
-    if not weights.shape == r1.shape:
+    if not weights.shape == psp_rets.shape:
         # make sure shapes coincides
         raise ValueError("Weight shapes do not match psp_rets (and lhp_rets) shape")
         
@@ -1062,6 +1062,66 @@ def ldi_glidepath_allocator(psp_rets, lhp_rets, start=1, end=0):
     paths.index   = psp_rets.index
     paths.columns = psp_rets.columns
     return paths
+
+def ldi_floor_allocator(psp_rets, lhp_rets, zcb_price, floor, m=3):
+    '''
+    Allocate weights to PSP and LHP with the goal to provide exposure to the upside 
+    of the PSP without going violating the floor. 
+    The method uses a CPPI-style dynamic risk budgeting algorithm by investing a multiple 
+    of a cushion in the PSP. The cushion is computed by using a floor value to be 
+    equal to the floor times the prices of the ZCB.
+    The method return a pd.DataFrame containing the weights in the PSP 
+    '''
+    if not zcb_price.shape == psp_rets.shape:
+        raise ValueError("PSP rets and ZCB prices must have the same shape")
+        
+    dates, n_scenarios = psp_rets.shape
+    account_value  = np.repeat(1,n_scenarios)
+    floor_value    = np.repeat(1,n_scenarios)
+    weight_history = pd.DataFrame(index=psp_rets.index, columns=psp_rets.columns)
+    for date in range(dates):
+        floor_value = floor * zcb_price.iloc[date]
+        cushion = (account_value - floor_value) / account_value
+        # weights in the PSP and LHP 
+        psp_w = (m * cushion).clip(0,1)
+        lhp_w = 1 - psp_w
+        # update
+        account_value = psp_w*account_value*(1 + psp_rets.iloc[date]) + lhp_w*account_value*(1 + lhp_rets.iloc[date])
+        weight_history.iloc[date] = psp_w
+    return weight_history
+
+def ldi_drawdown_allocator(psp_rets, lhp_rets, maxdd=0.2):
+    '''
+    Allocate weights to PSP and LHP with the goal to provide exposure to the upside 
+    of the PSP without going violating the floor. 
+    The method uses a CPPI-style dynamic risk budgeting algorithm with a drawdown constraint: 
+    we investing a multiple m (equal the inverse of the maxdd) of the cushion in the PSP. 
+    The cushion is computed by using a floor value equal to (1-maxdd) times the current peak.
+    The method return a pd.DataFrame containing the weights in the PSP.
+    Also look at the LDI_FLOOR_ALLOCATOR.
+    '''
+    if not psp_rets.shape == lhp_rets.shape:
+        raise ValueError("PSP and LHP returns must have the same shape")
+        
+    # define the multipler as the inverse of the maximum drawdown
+    m = 1 / maxdd
+    dates, n_scenarios = psp_rets.shape
+    account_value  = np.repeat(1,n_scenarios)
+    floor_value    = np.repeat(1,n_scenarios)
+    peak_value     = np.repeat(1,n_scenarios)
+    weight_history = pd.DataFrame(index=psp_rets.index, columns=psp_rets.columns)
+    
+    for date in range(dates):
+        floor_value = (1 - maxdd)*peak_value
+        cushion = (account_value - floor_value) / account_value
+        # weights in the PSP and LHP 
+        psp_w = (m * cushion).clip(0,1)
+        lhp_w = 1 - psp_w
+        # update
+        account_value = psp_w*account_value*(1 + psp_rets.iloc[date]) + lhp_w*account_value*(1 + lhp_rets.iloc[date])
+        peak_value = np.maximum(peak_value, account_value)
+        weight_history.iloc[date] = psp_w
+    return weight_history 
 
 def insert_first_row_df(df, row):
     '''
