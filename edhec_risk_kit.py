@@ -996,24 +996,47 @@ def bond_returns(principal, bond_prices, coupon_rate, coupons_per_year, periods_
         tot_return = ( cf.sum() / bond_prices )**(1/maturity) - 1
         return tot_return[0]
 
-def mac_duration(cash_flows, discount_rate):
+def mac_duration(cash_flows, **kwargs):
     '''
-    Macaulay duration of an asset involving of regular cash flows such as a bond
+    Computed the Macaulay duration of an asset involving regular cash flows.
+    The input arguments have to be a pd.DataFrame of cash_flow, and optional arguments 
+    must to be either:
+       coupon_rate and coupons_per_year, in case we have a coupon-bearing bond
+    or:
+       discount_rate, in case we have a set of liabilities.
     '''
+    # optional parameters
+    coupon_rate      = kwargs.get("coupon_rate", None)
+    coupons_per_year = kwargs.get("coupons_per_year", None)
+    discount_rate    = kwargs.get("discount_rate", None)    
+
+    def compute_duration(cash_flows, discount_rate):
+        dates = cash_flows.index
+        # present value of single cash flows (discounted cash flows)
+        discount_cf = discount( dates, discount_rate ) * cash_flows
+        # weights: the present value of the entire payment, i.e., discount_cf.sum() is equal to the principal 
+        weights = discount_cf / discount_cf.sum()
+        # sum of weights * dates
+        return ( weights * pd.DataFrame(dates,index=weights.index) ).sum()[0]
+            
     if not isinstance(cash_flows,pd.DataFrame):
         cash_flows = pd.DataFrame(cash_flows)
         cash_flows.columns = [0]
     
-    times = cash_flows.index
-    
-    # present value of single cash flows (discounted cash flows)
-    discount_cf = discount( times, discount_rate ) * cash_flows
-        
-    # weights: the present value of the entire payment, i.e., discount_cf.sum() is equal to the principal 
-    weights = (discount_cf / discount_cf.sum()).values
-    
-    # cannot make weights*cf.index as weights a dataframe while times is a series
-    return np.sum( [w*t for w,t in zip(weights,times)] )
+    if len(kwargs)==0:
+        # we put in input a ZCB: return maturity 
+        return cash_flows.index[0]
+    if coupon_rate==None and coupons_per_year==None and discount_rate!=None:
+        # we put in input a set of liabilities
+        macd = compute_duration(cash_flows, discount_rate)
+    elif coupon_rate!=None and coupons_per_year!=None and discount_rate==None:
+        # we put in input a coupon-bearing bond
+        discount_rate = coupon_rate / coupons_per_year
+        macd = compute_duration(cash_flows, discount_rate) / coupons_per_year
+    else:
+        raise ValueError("Wrong inputs")
+            
+    return macd
 
 def ldi_mixer(psp_rets, lhp_rets, allocator, **kwargs):
     '''
