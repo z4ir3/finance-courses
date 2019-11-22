@@ -204,8 +204,8 @@ def var_gaussian(s, level=0.05, cf=False):
     if cf:
         S = skewness(s)
         K = kurtosis(s)
-        za = za + (za**2 - 1)*S/6 + (za**3 - 3*za)*(K-3)/24 - (2*za**3 - 5*za)*(S**2)/34    
-    return -( s.mean() + za * s.std() )
+        za = za + (za**2 - 1)*S/6 + (za**3 - 3*za)*(K-3)/24 - (2*za**3 - 5*za)*(S**2)/36    
+    return -( s.mean() + za * s.std(ddof=0) )
 
 def cvar_historic(s, level=0.05):
     '''
