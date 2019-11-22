@@ -144,7 +144,7 @@ def skewness(s):
     Computes the Skewness of the input Series or Dataframe.
     There is also the function scipy.stats.skew().
     '''
-    return ( ((s - s.mean()) / s.std())**3 ).mean()
+    return ( ((s - s.mean()) / s.std(ddof=0))**3 ).mean()
 
 def kurtosis(s):
     '''
@@ -174,7 +174,7 @@ def semivolatility(s):
     Returns the semivolatility of a series, i.e., the volatility of
     negative returns
     '''
-    return s[s<0].std() 
+    return s[s<0].std(ddof=0) 
 
 def var_historic(s, level=0.05):
     '''
