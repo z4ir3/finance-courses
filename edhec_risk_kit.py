@@ -312,7 +312,7 @@ def efficient_frontier(n_portfolios, rets, covmat, periods_per_year, risk_free_r
         cml: if True the method plots the capital market line;
         mvp: if True the method plots the minimum volatility portfolio;
         ewp: if True the method plots the equally weigthed portfolio. 
-    The variable periods_per_year can be, e.g., 12, 52, 252, in case of yearly, weekly, and daily data.
+    The variable periods_per_year can be, e.g., 12, 52, 252, in case of monthly, weekly, and daily data.
     '''   
     
     def append_row_df(df,vol,ret,spr,weights):
@@ -441,7 +441,7 @@ def optimal_weights(n_points, rets, covmatrix, periods_per_year):
     '''
     Returns a set of n_points optimal weights corresponding to portfolios (of the efficient frontier) 
     with minimum volatility constructed by fixing n_points target returns. 
-    The weights are obtaine by solving the minimization problem for the volatility. 
+    The weights are obtained by solving the minimization problem for the volatility. 
     '''
     target_rets = np.linspace(rets.min(), rets.max(), n_points)    
     weights = [minimize_volatility(rets, covmatrix, target) for target in target_rets]
