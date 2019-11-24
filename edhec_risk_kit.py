@@ -33,11 +33,11 @@ def get_ind_returns():
     '''
     Load and format the Ken French 30 Industry portfolios value weighted monthly returns 
     '''
-    ind = pd.read_csv("data/ind30_m_vw_rets.csv", index_col=0, parse_dates=True)
-    # Divide by 100, since they are returns
+    filepath = path_to_data_folder() + "ind30_m_vw_rets.csv"
+    ind = pd.read_csv(filepath, index_col=0, parse_dates=True)
     ind = ind / 100
     # the index is not yet of type datetime
-    ind.index = pd.to_datetime(ind.index, format="%Y%m") #.to_period("M") forces the index to be monthly period...
+    ind.index = pd.to_datetime(ind.index, format="%Y%m")
     # there will be blank spaces in the columns names
     ind.columns = ind.columns.str.strip()
     return ind
@@ -47,9 +47,10 @@ def get_ind_nfirms():
     '''
     Load and format the Ken French 30 Industry number of firms dataset
     '''
-    ind = pd.read_csv("data/ind30_m_nfirms.csv", index_col=0, parse_dates=True)
+    filepath = path_to_data_folder() + "ind30_m_nfirms.csv"
+    ind = pd.read_csv(filepath, index_col=0, parse_dates=True)
     # the index is not yet of type datetime
-    ind.index = pd.to_datetime(ind.index, format="%Y%m") #.to_period("M") forces the index to be monthly period...
+    ind.index = pd.to_datetime(ind.index, format="%Y%m")
     # there will be blank spaces in the columns names
     ind.columns = ind.columns.str.strip()
     return ind
@@ -58,9 +59,10 @@ def get_ind_size():
     '''
     Load and format the Ken French 30 Industry average (market cap) size
     '''
-    ind = pd.read_csv("data/ind30_m_size.csv", index_col=0, parse_dates=True)
+    filepath = path_to_data_folder() + "ind30_m_size.csv"
+    ind = pd.read_csv(filepath, index_col=0, parse_dates=True)
     # the index is not yet of type datetime
-    ind.index = pd.to_datetime(ind.index, format="%Y%m") #.to_period("M") forces the index to be monthly period...
+    ind.index = pd.to_datetime(ind.index, format="%Y%m")
     # there will be blank spaces in the columns names
     ind.columns = ind.columns.str.strip()
     return ind
