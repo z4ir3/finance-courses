@@ -4,14 +4,16 @@ import scipy.stats
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
+def path_to_data_folder():
+    return "/Users/mariacristinasampaolo/Documents/python/git-tracked/finance-courses/data/" 
 
 def get_ffme_returns():
     '''
     Returns the French-Fama dataset for the returns of the bottom and top 
     deciles (Low 10 (Small Caps) and Hi 10 (Large Caps)) of US stocks
     '''
-    rets = pd.read_csv("data/Portfolios_Formed_on_ME_monthly_EW.csv", index_col=0, parse_dates=True, na_values=-99.99)
-    # Divide by 100, since they are returns, and change the index to datatime
+    filepath = path_to_data_folder() + "Portfolios_Formed_on_ME_monthly_EW.csv"
+    rets = pd.read_csv(filepath, index_col=0, parse_dates=True, na_values=-99.99)
     rets = rets[["Lo 10", "Hi 10"]] / 100
     rets.index = pd.to_datetime(rets.index, format="%Y%m") #.to_period("M") forces the index to be monthly period...
     return rets 
@@ -20,8 +22,9 @@ def get_hfi_returns():
     '''
     Returns the EDHEC Hedge Funds Index returns
     '''
-    hfi = pd.read_csv("data/edhec-hedgefundindices.csv", index_col=0, parse_dates=True, na_values=-99.99)
-    # Divide by 100, since they are returns, and change the index to datatime
+    filepath = path_to_data_folder() + "edhec-hedgefundindices.csv"
+    hfi = pd.read_csv(filepath, index_col=0, parse_dates=True, na_values=-99.99)
+    #hfi = pd.read_csv("data/edhec-hedgefundindices.csv", index_col=0, parse_dates=True, na_values=-99.99)
     hfi = hfi / 100
     # the index is already of type datetime
     return hfi 
