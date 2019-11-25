@@ -42,7 +42,6 @@ def get_ind_returns():
     ind.columns = ind.columns.str.strip()
     return ind
 
-
 def get_ind_nfirms():
     '''
     Load and format the Ken French 30 Industry number of firms dataset
@@ -84,6 +83,7 @@ def get_total_market_index_returns():
     # finally, computes the total market returns         
     return (ind_cap_weights * ind_rets).sum(axis=1)
 
+
 def terminal_wealth(s):
     '''
     Computes the terminal wealth of a sequence of return, which is, in other words, 
@@ -94,10 +94,24 @@ def terminal_wealth(s):
         raise ValueError("Expected either a pd.DataFrame or pd.Series")
     return (1 + s).prod()
 
+def compound(s):
+    '''
+    Single compound rule for a pd.Dataframe or pd.Series of returns. 
+    The method returns a single number - using prod(). 
+    See also the TERMINAL_WEALTH method.
+    '''
+    if not isinstance(s, (pd.DataFrame, pd.Series)):
+        raise ValueError("Expected either a pd.DataFrame or pd.Series")
+    return (1 + s).prod() - 1
+    # Note that this is equivalent to (but slower than)
+    # return np.expm1( np.logp1(s).sum() )
+    
 def compound_returns(s, start=100):
     '''
-    Compound a Dataframe or Series of returns from an initial default value equal to 100.
+    Compound a pd.Dataframe or pd.Series of returns from an initial default value equal to 100.
     In the former case, the method compounds the returns for every column (Series) by using pd.aggregate. 
+    The method returns a pd.Dataframe or pd.Series - using cumprod(). 
+    See also the COMPOUND method.
     '''
     if isinstance(s, pd.DataFrame):
         return s.aggregate( compound_returns, start=start )
