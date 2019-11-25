@@ -83,6 +83,19 @@ def get_total_market_index_returns():
     # finally, computes the total market returns         
     return (ind_cap_weights * ind_rets).sum(axis=1)
 
+def get_brka_rets(monthly=False):
+    '''
+    Load and format Berkshire Hathaway's returns from 1990-01 to 2018-12.
+    Default data are daily returns. 
+    If monthly=True, then monthly data are returned. Here, the method used 
+    the .resample method which allows to run an aggregation function on each  
+    group of returns of the daily time series.
+    '''
+    filepath = path_to_data_folder() + "brka_d_ret.csv"
+    rets = pd.read_csv(filepath, index_col=0, parse_dates=True)
+    if monthly:
+        rets = rets.resample("M").apply( compound )
+    return rets
 
 def terminal_wealth(s):
     '''
