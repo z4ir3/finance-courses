@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import scipy.stats
 import matplotlib.pyplot as plt
+import statsmodels.api as sm
 from scipy.optimize import minimize
 
 def path_to_data_folder():
@@ -93,21 +94,21 @@ def get_brka_rets(monthly=False):
     filepath = path_to_data_folder() + "brka_d_ret.csv"
     rets = pd.read_csv(filepath, index_col=0, parse_dates=True)
     if monthly:
-        rets = rets.resample("M").apply( compound )
+        rets = rets.resample("M").apply( compound ).to_period("M")
     return rets
 
 def get_fff_returns():
     '''
     Load the Fama-French Research Factors Monthly Dataset.
     Factors returned are those of the Fama-French model:
-    - Market minus Risk-Free Rate,
+    - Excess return of the market, i.e., Market minus Risk-Free Rate,
     - Small (size) Minus Big (size) SMB,
     - High (B/P ratio) Minus Low (B/P ratio) HML, 
     - and the Risk Free Rate 
     '''
     filepath = path_to_data_folder() + "F-F_Research_Data_Factors_m.csv"
     fff = pd.read_csv(filepath, index_col=0, parse_dates=True, na_values=-99.99) / 100
-    fff.index = pd.to_datetime(fff.index, format="%Y%m")
+    fff.index = pd.to_datetime(fff.index, format="%Y%m").to_period("M")
     return fff 
 
 def terminal_wealth(s):
@@ -1168,6 +1169,22 @@ def ldi_drawdown_allocator(psp_rets, lhp_rets, maxdd=0.2):
         peak_value = np.maximum(peak_value, account_value)
         weight_history.iloc[date] = psp_w
     return weight_history 
+
+def linear_regression(dep_var, exp_vars, alpha=True):
+    '''
+    Runs a linear regression to decompose the dependent variable into the explanatory variables 
+    using statsmodels OLS method. 
+    It returns the object of type statsmodel's RegressionResults on which we can call on it:
+    - .summary() to print a full summary
+    - .params for the coefficients
+    - .tvalues and .pvalues for the significance levels
+    - .rsquared_adj and .rsquared for quality of fit
+    '''
+    if alpha:
+        # the OLS methods assume a bias equal to 0, hence a specific variable for the bias has to be given
+        exp_vars = exp_vars.copy()
+        exp_vars["Alpha"] = 1
+    return sm.OLS(dep_var, exp_vars).fit()
 
 def insert_first_row_df(df, row):
     '''
