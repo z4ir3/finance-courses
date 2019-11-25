@@ -24,7 +24,6 @@ def get_hfi_returns():
     '''
     filepath = path_to_data_folder() + "edhec-hedgefundindices.csv"
     hfi = pd.read_csv(filepath, index_col=0, parse_dates=True, na_values=-99.99)
-    #hfi = pd.read_csv("data/edhec-hedgefundindices.csv", index_col=0, parse_dates=True, na_values=-99.99)
     hfi = hfi / 100
     # the index is already of type datetime
     return hfi 
@@ -96,6 +95,20 @@ def get_brka_rets(monthly=False):
     if monthly:
         rets = rets.resample("M").apply( compound )
     return rets
+
+def get_fff_returns():
+    '''
+    Load the Fama-French Research Factors Monthly Dataset.
+    Factors returned are those of the Fama-French model:
+    - Market minus Risk-Free Rate,
+    - Small (size) Minus Big (size) SMB,
+    - High (B/P ratio) Minus Low (B/P ratio) HML, 
+    - and the Risk Free Rate 
+    '''
+    filepath = path_to_data_folder() + "F-F_Research_Data_Factors_m.csv"
+    fff = pd.read_csv(filepath, index_col=0, parse_dates=True, na_values=-99.99) / 100
+    fff.index = pd.to_datetime(fff.index, format="%Y%m")
+    return fff 
 
 def terminal_wealth(s):
     '''
