@@ -24,60 +24,9 @@ def get_hfi_returns():
     Returns the EDHEC Hedge Funds Index returns
     '''
     filepath = path_to_data_folder() + "edhec-hedgefundindices.csv"
-    hfi = pd.read_csv(filepath, index_col=0, parse_dates=True, na_values=-99.99)
-    hfi = hfi / 100
+    hfi = pd.read_csv(filepath, index_col=0, parse_dates=True, na_values=-99.99) / 100.0
     # the index is already of type datetime
     return hfi 
-
-def get_ind_returns():
-    '''
-    Load and format the Ken French 30 Industry portfolios value weighted monthly returns 
-    '''
-    filepath = path_to_data_folder() + "ind30_m_vw_rets.csv"
-    ind = pd.read_csv(filepath, index_col=0, parse_dates=True)
-    ind = ind / 100
-    # the index is not yet of type datetime
-    ind.index = pd.to_datetime(ind.index, format="%Y%m").to_period("M")
-    # there will be blank spaces in the columns names
-    ind.columns = ind.columns.str.strip()
-    return ind
-
-def get_ind_nfirms():
-    '''
-    Load and format the Ken French 30 Industry number of firms dataset
-    '''
-    filepath = path_to_data_folder() + "ind30_m_nfirms.csv"
-    ind = pd.read_csv(filepath, index_col=0, parse_dates=True)
-    ind.index = pd.to_datetime(ind.index, format="%Y%m").to_period("M")
-    ind.columns = ind.columns.str.strip()
-    return ind
-
-def get_ind_size():
-    '''
-    Load and format the Ken French 30 Industry average (market cap) size
-    '''
-    filepath = path_to_data_folder() + "ind30_m_size.csv"
-    ind = pd.read_csv(filepath, index_col=0, parse_dates=True)
-    ind.index = pd.to_datetime(ind.index, format="%Y%m").to_period("M")
-    ind.columns = ind.columns.str.strip()
-    return ind
-
-def get_total_market_index_returns():
-    '''
-    Computes the (total market) returns from the Ken French 30 Industry portfolio
-    '''
-    # Load the portfolio returns, number of firms, and average size
-    ind_rets   = get_ind_returns()
-    ind_nfirms = get_ind_nfirms()
-    ind_size   = get_ind_size()     
-    # compute the market capitalization of each industry sector
-    ind_mkt_cap = ind_nfirms * ind_size
-    # compute the total market capitalization
-    total_mkt_cap = ind_mkt_cap.sum(axis=1)
-    # compute the single market capitalizations as a percentage of the total market cap
-    ind_cap_weights = ind_mkt_cap.divide(total_mkt_cap, axis=0)
-    # finally, computes the total market returns         
-    return (ind_cap_weights * ind_rets).sum(axis=1)
 
 def get_brka_rets(monthly=False):
     '''
@@ -106,6 +55,59 @@ def get_fff_returns():
     fff = pd.read_csv(filepath, index_col=0, parse_dates=True, na_values=-99.99) / 100
     fff.index = pd.to_datetime(fff.index, format="%Y%m").to_period("M")
     return fff 
+
+def get_ind_returns(ew=False):
+    '''
+    Load and format the Kenneth French 30 Industry portfolios monthly returns.
+    Two portfolios can be loaded:
+    - value-weighted (ew=False) 
+    - equally-weighted (ew=True)
+    '''
+    portfolio_w = "ew" if ew==True else "vw" 
+    filepath = path_to_data_folder() + "ind30_m_{}_rets.csv" .format(portfolio_w)
+    ind = pd.read_csv(filepath, index_col=0, parse_dates=True) / 100.0
+    # the index is not yet of type datetime
+    ind.index = pd.to_datetime(ind.index, format="%Y%m").to_period("M")
+    # there will be blank spaces in the columns names
+    ind.columns = ind.columns.str.strip()
+    return ind
+
+def get_ind_nfirms():
+    '''
+    Load and format the Kenneth French 30 Industry number of firms dataset
+    '''
+    filepath = path_to_data_folder() + "ind30_m_nfirms.csv"
+    ind = pd.read_csv(filepath, index_col=0, parse_dates=True)
+    ind.index = pd.to_datetime(ind.index, format="%Y%m").to_period("M")
+    ind.columns = ind.columns.str.strip()
+    return ind
+
+def get_ind_size():
+    '''
+    Load and format the Kenneth French 30 Industry average (market cap) size
+    '''
+    filepath = path_to_data_folder() + "ind30_m_size.csv"
+    ind = pd.read_csv(filepath, index_col=0, parse_dates=True)
+    ind.index = pd.to_datetime(ind.index, format="%Y%m").to_period("M")
+    ind.columns = ind.columns.str.strip()
+    return ind
+
+def get_total_market_index_returns():
+    '''
+    Computes the (total market) returns from the Ken French 30 Industry portfolio
+    '''
+    # Load the portfolio returns, number of firms, and average size
+    ind_rets   = get_ind_returns()
+    ind_nfirms = get_ind_nfirms()
+    ind_size   = get_ind_size()     
+    # compute the market capitalization of each industry sector
+    ind_mkt_cap = ind_nfirms * ind_size
+    # compute the total market capitalization
+    total_mkt_cap = ind_mkt_cap.sum(axis=1)
+    # compute the single market capitalizations as a percentage of the total market cap
+    ind_cap_weights = ind_mkt_cap.divide(total_mkt_cap, axis=0)
+    # finally, computes the total market returns         
+    return (ind_cap_weights * ind_rets).sum(axis=1)
 
 def terminal_wealth(s):
     '''
@@ -1204,6 +1206,10 @@ def style_analysis(dep_var, exp_vars):
     Returns the optimal weights that minimizes the tracking error between a portfolio 
     of the explanatory (return) variables and the dependent (return) variable.
     '''
+    # dep_var is expected to be a pd.Series
+    if isinstance(dep_var,pd.DataFrame):
+        dep_var = dep_var[dep_var.columns[0]]
+    
     n = exp_vars.shape[1]
     init_guess = np.repeat(1/n, n)
     weights_const = {
