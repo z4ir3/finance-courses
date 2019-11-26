@@ -78,7 +78,7 @@ def get_ind_file(filetype="rets", nind=30, ew=False):
         divisor = 1
     else:
         raise ValueError("filetype must be one of: rets, nfirms, size")
-    filepath = erk.path_to_data_folder() + "ind{}_m_{}.csv" .format(nind, name)
+    filepath = path_to_data_folder() + "ind{}_m_{}.csv" .format(nind, name)
     ind = pd.read_csv(filepath, index_col=0, parse_dates=True) / divisor
     ind.index = pd.to_datetime(ind.index, format="%Y%m").to_period("M")
     ind.columns = ind.columns.str.strip()
@@ -1247,6 +1247,50 @@ def style_analysis(dep_var, exp_vars):
                         bounds=((0.0, 1.0),)*n)
     weights = pd.Series(solution.x, index=exp_vars.columns)
     return weights
+
+def weight_ew(r, cap_ws=None, max_cw_mult=None, microcap_thr=None, **kwargs):
+    """
+    Returns the weights of the Equally-Weighted (EW) portfolio based on the asset returns "r" as a DataFrame. 
+    If the set of cap_ws is given, the modified scheme is computed, i.e., 
+    microcaps are removed and a capweight tether applied.
+    """
+    ew = pd.Series(1/len(r.columns), index=r.columns)
+    if cap_ws is not None:
+        cw = cap_ws.loc[r.index[0]] # starting cap weight
+        if microcap_thr is not None and microcap_thr > 0.0:
+            # exclude microcaps according to the threshold    
+            ew[ cw < microcap_thr ] = 0
+            ew = ew / ew.sum()
+        if max_cw_mult is not None and max_cw_mult > 0:
+            # limit weight up to a multiple of capweight
+            ew = np.minimum(ew, cw*max_cw_mult)
+            ew = ew / ew.sum()
+    return ew
+
+def weight_cw(r, cap_ws, **kwargs):
+    '''
+    Returns the weights of the Cap-Weigthed (CW) portfolio based on the time series of capweights
+    '''
+    return cap_ws.loc[r.index[0]]
+    # which is equal to:
+    # w = cap_ws.loc[r.index[0]]
+    # return w / w.sum()
+    # since cap_ws are already normalized
+
+def backtest_weight_scheme(r, window=52, weight_scheme=weight_ew, **kwargs):
+    '''
+    Backtests a given weighting scheme. Here:
+    - r: asset returns to use to build the portfolio
+    - window: the rolling window used
+    - weight_scheme: the weighting scheme to use, it must the name of a 
+    method that takes "r", and a variable number of keyword-value arguments
+    '''
+    n_periods = r.shape[0]
+    windows = [ (start, start+window) for start in range(0,n_periods-window+1) ]
+    weights = [ weight_scheme( r.iloc[win[0]:win[1]], **kwargs) for win in windows ]
+    weights = pd.DataFrame(weights, index=r.iloc[window-1:].index, columns=r.columns)    
+    returns = (weights * r).sum(axis=1,  min_count=1) #mincount is to generate NAs if all inputs are NAs
+    return returns
 
 def insert_first_row_df(df, row):
     '''
