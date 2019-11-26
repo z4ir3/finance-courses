@@ -37,7 +37,7 @@ def get_ind_returns():
     ind = pd.read_csv(filepath, index_col=0, parse_dates=True)
     ind = ind / 100
     # the index is not yet of type datetime
-    ind.index = pd.to_datetime(ind.index, format="%Y%m")
+    ind.index = pd.to_datetime(ind.index, format="%Y%m").to_period("M")
     # there will be blank spaces in the columns names
     ind.columns = ind.columns.str.strip()
     return ind
@@ -48,9 +48,7 @@ def get_ind_nfirms():
     '''
     filepath = path_to_data_folder() + "ind30_m_nfirms.csv"
     ind = pd.read_csv(filepath, index_col=0, parse_dates=True)
-    # the index is not yet of type datetime
-    ind.index = pd.to_datetime(ind.index, format="%Y%m")
-    # there will be blank spaces in the columns names
+    ind.index = pd.to_datetime(ind.index, format="%Y%m").to_period("M")
     ind.columns = ind.columns.str.strip()
     return ind
 
@@ -60,9 +58,7 @@ def get_ind_size():
     '''
     filepath = path_to_data_folder() + "ind30_m_size.csv"
     ind = pd.read_csv(filepath, index_col=0, parse_dates=True)
-    # the index is not yet of type datetime
-    ind.index = pd.to_datetime(ind.index, format="%Y%m")
-    # there will be blank spaces in the columns names
+    ind.index = pd.to_datetime(ind.index, format="%Y%m").to_period("M")
     ind.columns = ind.columns.str.strip()
     return ind
 
@@ -1185,6 +1181,44 @@ def linear_regression(dep_var, exp_vars, alpha=True):
         exp_vars = exp_vars.copy()
         exp_vars["Alpha"] = 1
     return sm.OLS(dep_var, exp_vars).fit()
+
+def tracking_error(r_a, r_b):
+    '''
+    Returns the tracking error between two return series. 
+    This method is used in Sharpe Analysis minimization problem.
+    See STYLE_ANALYSIS method.
+    '''
+    return ( ((r_a - r_b)**2).sum() )**(0.5)
+
+def style_analysis_tracking_error(weights, ref_r, bb_r):
+    '''
+    Sharpe style analysis objective function.
+    Returns the tracking error between the reference returns
+    and a portfolio of building block returns held with given weights. 
+    '''
+    return tracking_error(ref_r, (weights*bb_r).sum(axis=1))
+
+def style_analysis(dep_var, exp_vars):
+    '''
+    Sharpe style analysis optimization problem.
+    Returns the optimal weights that minimizes the tracking error between a portfolio 
+    of the explanatory (return) variables and the dependent (return) variable.
+    '''
+    n = exp_vars.shape[1]
+    init_guess = np.repeat(1/n, n)
+    weights_const = {
+        'type': 'eq',
+        'fun': lambda weights: 1 - np.sum(weights)
+    }
+    solution = minimize(style_analysis_tracking_error, 
+                        init_guess,
+                        method='SLSQP',
+                        options={'disp': False},
+                        args=(dep_var, exp_vars),
+                        constraints=(weights_const,),
+                        bounds=((0.0, 1.0),)*n)
+    weights = pd.Series(solution.x, index=exp_vars.columns)
+    return weights
 
 def insert_first_row_df(df, row):
     '''
