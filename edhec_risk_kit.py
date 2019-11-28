@@ -123,14 +123,6 @@ def get_total_market_index(nind=30, capital=1000):
     total_market_index  = capital * (1 + total_market_return).cumprod()
     return total_market_index
 
-
-
-
-
-
-
-
-
 def terminal_wealth(s):
     '''
     Computes the terminal wealth of a sequence of return, which is, in other words, 
@@ -1291,6 +1283,24 @@ def backtest_weight_scheme(r, window=52, weight_scheme=weight_ew, **kwargs):
     weights = pd.DataFrame(weights, index=r.iloc[window-1:].index, columns=r.columns)    
     returns = (weights * r).sum(axis=1,  min_count=1) #mincount is to generate NAs if all inputs are NAs
     return returns
+
+def annualize_vol_ewa(r, decay=0.95, periods_per_year=12):
+    '''
+    Computes the annualized exponentially weighted average volatility of a 
+    series of returns given a decay (smoothing) factor in input. 
+    '''
+    N = r.shape[0]
+    times = np.arange(0,N,1)
+    # compute the square error returns
+    sq_errs = pd.DataFrame( ( r - r.mean() )**2 )
+    # exponential weights
+    weights = [ decay**(N-t) for t in times ] / np.sum(decay**(N-times))
+    weights = pd.DataFrame(weights, index=r.index)
+    # EWA
+    vol_ewa = (weights * sq_errs).sum()**(0.5)
+    # Annualize the computed volatility
+    ann_vol_ewa = vol_ewa[0] * np.sqrt(periods_per_year)
+    return ann_vol_ewa
 
 def insert_first_row_df(df, row):
     '''
