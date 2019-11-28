@@ -1269,7 +1269,7 @@ def weight_cw(r, cap_ws, **kwargs):
     # return w / w.sum()
     # since cap_ws are already normalized
 
-def backtest_weight_scheme(r, window=52, weight_scheme=weight_ew, **kwargs):
+def backtest_weight_scheme(r, window=36, weight_scheme=weight_ew, **kwargs):
     '''
     Backtests a given weighting scheme. Here:
     - r: asset returns to use to build the portfolio
@@ -1278,9 +1278,9 @@ def backtest_weight_scheme(r, window=52, weight_scheme=weight_ew, **kwargs):
     method that takes "r", and a variable number of keyword-value arguments
     '''
     n_periods = r.shape[0]
-    windows = [ (start, start+window) for start in range(0,n_periods-window+1) ]
+    windows = [ (start, start+window) for start in range(0,n_periods-window) ]
     weights = [ weight_scheme( r.iloc[win[0]:win[1]], **kwargs) for win in windows ]
-    weights = pd.DataFrame(weights, index=r.iloc[window-1:].index, columns=r.columns)    
+    weights = pd.DataFrame(weights, index=r.iloc[window:].index, columns=r.columns)    
     returns = (weights * r).sum(axis=1,  min_count=1) #mincount is to generate NAs if all inputs are NAs
     return returns
 
@@ -1301,6 +1301,57 @@ def annualize_vol_ewa(r, decay=0.95, periods_per_year=12):
     # Annualize the computed volatility
     ann_vol_ewa = vol_ewa[0] * np.sqrt(periods_per_year)
     return ann_vol_ewa
+
+def sample_cov(r, **kwargs):
+    '''
+    Returns the sample covariance of the supplied series of returns (a pd.DataFrame) 
+    '''
+    if not isinstance(r,pd.DataFrame):
+        raise ValueError("Expected r to be a pd.DataFrame of returns series")
+    return r.cov()
+
+def cc_cov(r, **kwargs):
+    '''
+    Estimates a covariance matrix by using the Elton/Gruber Constant Correlation model
+    '''
+    # correlation coefficents  
+    rhos = r.corr()
+    n = rhos.shape[0]
+    # compute the mean correlation: since the matrix rhos is a symmetric with diagonals all 1, 
+    # the mean correlation can be computed by:
+    mean_rho = (rhos.values.sum() - n) / (n**2-n) 
+    # create the constant correlation matrix containing 1 on the diagonal and the mean correlation outside
+    ccor = np.full_like(rhos, mean_rho)
+    np.fill_diagonal(ccor, 1.)
+    # create the new covariance matrix by multiplying mean_rho*std_i*std_i 
+    # the product of the stds is done via np.outer
+    ccov = ccor * np.outer(r.std(), r.std())
+    return pd.DataFrame(ccov, index=r.columns, columns=r.columns)
+
+def shrinkage_cov(r, delta=0.5, **kwargs):
+    '''
+    Statistical shrinkage: it returns a covariance matrix estimator that shrinks between 
+    the constant correlation and standard sample covariance estimators 
+    '''
+    samp_cov  = sample_cov(r, **kwargs)
+    const_cov = cc_cov(r, **kwargs)
+    return delta*const_cov + (1-delta)*samp_cov
+
+def weight_minvar(r, cov_estimator=sample_cov, periods_per_year=12, **kwargs):
+    '''
+    Produces the weights of the Minimum Volatility portfolio given a covariance matrix of the returns 
+    '''
+    est_cov = cov_estimator(r, **kwargs)
+    ann_ret = annualize_rets(r, periods_per_year=12)
+    return minimize_volatility(ann_ret, est_cov)
+
+def weight_maxsharpe(r, cov_estimator=sample_cov, periods_per_year=12, risk_free_rate=0.03, **kwargs):
+    '''
+    Produces the weights of the Maximum Sharpe Ratio portfolio given a covariance matrix of the returns 
+    '''
+    est_cov = cov_estimator(r, **kwargs)
+    ann_ret = annualize_rets(r, periods_per_year=12)
+    return maximize_shape_ratio(ann_ret, est_cov, risk_free_rate=risk_free_rate, periods_per_year=periods_per_year)
 
 def insert_first_row_df(df, row):
     '''
