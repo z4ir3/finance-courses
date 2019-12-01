@@ -1198,6 +1198,21 @@ def linear_regression(dep_var, exp_vars, alpha=True):
         exp_vars["Alpha"] = 1
     return sm.OLS(dep_var, exp_vars).fit()
 
+def capm_betas(ri, rm):
+    '''
+    Returns the CAPM factor exposures beta for each asset in the ri pd.DataFrame, 
+    where rm is the pd.DataFrame (or pd.Series) of the market return (not excess return).
+    The betas are defined as:
+      beta_i = Cov(r_i, rm) / Var(rm)
+    with r_i being the ith column (i.e., asset) of DataFrame ri.
+    '''
+    market_var = ( rm.std()**2 )[0]
+    betas = []
+    for name in ri.columns:
+        cov_im = pd.concat( [ri[name],rm], axis=1).cov().iloc[0,1]
+        betas.append( cov_im / market_var )
+    return pd.Series(betas, index=ri.columns)
+
 def tracking_error(r_a, r_b):
     '''
     Returns the tracking error between two return series. 
