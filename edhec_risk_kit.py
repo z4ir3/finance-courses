@@ -4,6 +4,8 @@ import scipy.stats
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from scipy.optimize import minimize
+from numpy.linalg import inv
+
 
 def path_to_data_folder():
     return "/Users/mariacristinasampaolo/Documents/python/git-tracked/finance-courses/data/" 
@@ -630,6 +632,19 @@ def maximize_shape_ratio(rets, covmatrix, risk_free_rate, periods_per_year, targ
                       bounds = ((0.0,1.0),)*n_assets)
     return result.x
 
+def weigths_max_sharpe_ratio(covmat, mu_exc, scale=True):
+    '''
+    Optimal (Tangent/Max Sharpe Ratio) portfolio weights using the Markowitz Optimization Procedure:
+    - mu_exc is the vector of Excess expected Returns (has to be a column vector as a pd.Series)
+    - covmat is the covariance N x N matrix as a pd.DataFrame
+    Look at pag. 188 eq. (5.2.28) of "The econometrics of financial markets", by Campbell, Lo, Mackinlay.
+    '''
+    w = inverse_df(covmat).dot(mu_exc)
+    if scale:
+        # normalize weigths
+        w = w/sum(w) 
+    return w
+    
 def cppi(risky_rets, safe_rets=None, start_value=1000, floor=0.8, m=3, drawdown=None,
          risk_free_rate=0.03, periods_per_year=12):
     '''
@@ -1367,6 +1382,87 @@ def weight_maxsharpe(r, cov_estimator=sample_cov, periods_per_year=12, risk_free
     est_cov = cov_estimator(r, **kwargs)
     ann_ret = annualize_rets(r, periods_per_year=12)
     return maximize_shape_ratio(ann_ret, est_cov, risk_free_rate=risk_free_rate, periods_per_year=periods_per_year)
+    
+def implied_returns(covmat, weigths, delta=2.5):
+    '''
+    Computes the implied expected returns \Pi by reverse engineering the weights according to 
+    the Black-Litterman model:
+       \Pi = \delta \Sigma weigths
+    Here, the inputs are:
+    - delta, the risk aversion coefficient
+    - covmat: variance-covariance matrix (N x N) as pd.DataFrame (\Sigma)
+    - weigths: portfolio weights (N x 1) as pd.Series 
+    The output is the \Pi returns pd.Series (N x 1) 
+    '''
+    imp_rets = delta * covmat.dot(weigths).squeeze() # to get a series from a 1-column dataframe
+    imp_rets.name = 'Implied Returns'
+    return imp_rets
+
+def omega_uncertain_prior(covmat, tau, P):
+    '''
+    Returns the He-Litterman simplified Omega matrix in case the investor does not explicitly 
+    quantify the uncertainty on the views. This matrix is going to be:
+       \Omega := diag( P(\tau\Sigma)P^T ) 
+    Inputs:
+    - covmat: N x N covariance Matrix as pd.DataFrame (\Sigma)
+    - tau: a scalar denoting the uncertainty of the CAPM prior
+    - P: the Projection K x N matrix as a pd.DataFrame.
+    The output is a P x P matrix as a pd.DataFrame, representing the Prior Uncertainties.
+    '''
+    he_lit_omega = P.dot(tau * covmat).dot(P.T)
+    # Make a diag matrix from the diag elements of Omega
+    return pd.DataFrame( np.diag(np.diag(he_lit_omega.values)), index=P.index, columns=P.index )
+
+def black_litterman(w_prior, Sigma_prior, P, Q, Omega=None, delta=2.5, tau=0.02):
+    '''
+    Black-Litterman model.
+    Computes the posterior expected returns and covariaces based on the original Black-Litterman model 
+    using the Master formulas, where:
+    - w_prior is the N x 1 pd.Series of prior weights
+    - Sigma_prior is the N x N covariance matrix as a pd.DataFrame
+    - P is the projection K x N matrix of weights portfolio views, a pd.DataFrame
+    - Q is the K x 1 pd.Series of views
+    - Omega is the K x K matrix as a pd.DataFrame (or None) representing the uncertainty of the views. 
+      In particualar, if Omega=None, we assume that it is proportional to variance of the prior (see OMEGA_UNCERTAIN_PRIOR).
+    - delta is the risk aversion (scalar)
+    - tau represents the uncertainty of the CAPM prior (scalar)
+    '''
+    if Omega is None:
+        Omega = omega_uncertain_prior(Sigma_prior, tau, P)
+    # Force w.prior and Q to be column vectors
+    #w_prior = as_colvec(w_prior)
+    #Q = as_colvec(Q)
+    
+    # number of assets
+    N = w_prior.shape[0]
+
+    # number of views
+    K = Q.shape[0]
+    
+    # First, reverse-engineer the weights to get \Pi = \delta\Sigma\w^{prior}
+    Pi = implied_returns(Sigma_prior,  w_prior, delta)
+        
+    # Black-Litterman posterior estimate (Master Formulas), using the versions that do not require Omega to be inverted
+    invmat   = inv( P.dot(tau * Sigma_prior).dot(P.T) + Omega )
+    mu_bl    = Pi + (tau * Sigma_prior).dot(P.T).dot(invmat.dot(Q - P.dot(Pi).values))
+    sigma_bl = Sigma_prior + (tau * Sigma_prior) - (tau * Sigma_prior).dot(P.T).dot(invmat).dot(P).dot(tau * Sigma_prior)
+    return (mu_bl, sigma_bl)
+
+def as_colvec(x):
+    '''
+    In order to consistently use column vectors, this method takes either a np.array or a np.column 
+    matrix (i.e., a column vector) and returns the input data as a column vector.
+    '''
+    if (x.ndim == 2):
+        return x
+    else:
+        return np.expand_dims(x, axis=1)
+    
+def inverse_df(d):
+    '''
+    Inverse of a pd.DataFrame (i.e., inverse of dataframe.values)
+    '''
+    return pd.DataFrame( inv(d.values), index=d.columns, columns=d.index)
 
 def insert_first_row_df(df, row):
     '''
