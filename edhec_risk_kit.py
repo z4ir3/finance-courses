@@ -6,7 +6,6 @@ import statsmodels.api as sm
 from scipy.optimize import minimize
 from numpy.linalg import inv
 
-
 def path_to_data_folder():
     return "/Users/mariacristinasampaolo/Documents/python/git-tracked/finance-courses/data/" 
 
@@ -18,7 +17,7 @@ def get_ffme_returns():
     filepath = path_to_data_folder() + "Portfolios_Formed_on_ME_monthly_EW.csv"
     rets = pd.read_csv(filepath, index_col=0, parse_dates=True, na_values=-99.99)
     rets = rets[["Lo 10", "Hi 10"]] / 100
-    rets.index = pd.to_datetime(rets.index, format="%Y%m") #.to_period("M") forces the index to be monthly period...
+    rets.index = pd.to_datetime(rets.index, format="%Y%m").to_period("M") #.to_period("M") forces the index to be monthly period...
     return rets 
    
 def get_hfi_returns():
@@ -417,16 +416,16 @@ def efficient_frontier(n_portfolios, rets, covmat, periods_per_year, risk_free_r
                 ax.legend()
             if hsr:
                 # Plot the highest sharpe ratio portfolio
-                ax.scatter([vol], [ret], marker="o", color="g", label="Highest sharpe ratio portfolio")
+                ax.scatter([vol], [ret], marker="o", color="g", label="MSR portfolio")
                 ax.legend()
         if mvp:
-            # Plot the equally weighted portfolio:
+            # Plot the global minimum portfolio:
             w   = minimize_volatility(ann_rets, covmat)
             ret = portfolio_return(w, ann_rets)
             vol = annualize_vol( portfolio_volatility(w,covmat), periods_per_year)
             spr = sharpe_ratio(ret, risk_free_rate, periods_per_year, v=vol)
             df  = append_row_df(df,vol,ret,spr,w)
-            ax.scatter([vol], [ret], color="midnightblue", marker="o", label="Minimum volatility portfolio")
+            ax.scatter([vol], [ret], color="midnightblue", marker="o", label="GMV portfolio")
             ax.legend()  
         if ewp:
             # Plot the equally weighted portfolio:
@@ -435,7 +434,7 @@ def efficient_frontier(n_portfolios, rets, covmat, periods_per_year, risk_free_r
             vol = annualize_vol( portfolio_volatility(w,covmat), periods_per_year)
             spr = sharpe_ratio(ret, risk_free_rate, periods_per_year, v=vol)
             df  = append_row_df(df,vol,ret,spr,w)
-            ax.scatter([vol], [ret], color="goldenrod", marker="o", label="Equally weighted portfolio")
+            ax.scatter([vol], [ret], color="goldenrod", marker="o", label="EW portfolio")
             ax.legend()
         return df, ax
     else: 
@@ -1447,6 +1446,23 @@ def black_litterman(w_prior, Sigma_prior, P, Q, Omega=None, delta=2.5, tau=0.02)
     mu_bl    = Pi + (tau * Sigma_prior).dot(P.T).dot(invmat.dot(Q - P.dot(Pi).values))
     sigma_bl = Sigma_prior + (tau * Sigma_prior) - (tau * Sigma_prior).dot(P.T).dot(invmat).dot(P).dot(tau * Sigma_prior)
     return (mu_bl, sigma_bl)
+
+def portfolio_risk_contributions(weigths, matcov):
+    '''
+    Compute the contributions to risk of the asset constituents of a portfolio, 
+    given a set of portfolio weights and a covariance matrix.
+    The input weigths has to be either a np.array or a pd.Series
+    while matcov must be a pd.DataFrame.
+    '''
+    portfolio_var = portfolio_volatility(weigths, matcov)**2
+    # marginal contribution of each constituent: the "@" operator is equal to np.dot but return a pd.Series
+    marginal_contrib = matcov @ weigths
+    # vector of risk contributions
+    risk_contrib = np.multiply(marginal_contrib, weigths.T) / portfolio_var
+    return risk_contrib
+
+
+
 
 def as_colvec(x):
     '''
