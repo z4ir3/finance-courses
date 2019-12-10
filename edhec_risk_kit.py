@@ -1269,68 +1269,9 @@ def style_analysis(dep_var, exp_vars):
     weights = pd.Series(solution.x, index=exp_vars.columns)
     return weights
 
-def weight_ew(r, cap_ws=None, max_cw_mult=None, microcap_thr=None, **kwargs):
-    """
-    Returns the weights of the Equally-Weighted (EW) portfolio based on the asset returns "r" as a DataFrame. 
-    If the set of cap_ws is given, the modified scheme is computed, i.e., 
-    microcaps are removed and a capweight tether applied.
-    """
-    ew = pd.Series(1/len(r.columns), index=r.columns)
-    if cap_ws is not None:
-        cw = cap_ws.loc[r.index[0]] # starting cap weight
-        if microcap_thr is not None and microcap_thr > 0.0:
-            # exclude microcaps according to the threshold    
-            ew[ cw < microcap_thr ] = 0
-            ew = ew / ew.sum()
-        if max_cw_mult is not None and max_cw_mult > 0:
-            # limit weight up to a multiple of capweight
-            ew = np.minimum(ew, cw*max_cw_mult)
-            ew = ew / ew.sum()
-    return ew
-
-def weight_cw(r, cap_ws, **kwargs):
-    '''
-    Returns the weights of the Cap-Weigthed (CW) portfolio based on the time series of capweights
-    '''
-    return cap_ws.loc[r.index[0]]
-    # which is equal to:
-    # w = cap_ws.loc[r.index[0]]
-    # return w / w.sum()
-    # since cap_ws are already normalized
-
-def backtest_weight_scheme(r, window=36, weight_scheme=weight_ew, **kwargs):
-    '''
-    Backtests a given weighting scheme. Here:
-    - r: asset returns to use to build the portfolio
-    - window: the rolling window used
-    - weight_scheme: the weighting scheme to use, it must the name of a 
-    method that takes "r", and a variable number of keyword-value arguments
-    '''
-    n_periods = r.shape[0]
-    windows = [ (start, start+window) for start in range(0,n_periods-window) ]
-    weights = [ weight_scheme( r.iloc[win[0]:win[1]], **kwargs) for win in windows ]
-    weights = pd.DataFrame(weights, index=r.iloc[window:].index, columns=r.columns)    
-    returns = (weights * r).sum(axis=1,  min_count=1) #mincount is to generate NAs if all inputs are NAs
-    return returns
-
-def annualize_vol_ewa(r, decay=0.95, periods_per_year=12):
-    '''
-    Computes the annualized exponentially weighted average volatility of a 
-    series of returns given a decay (smoothing) factor in input. 
-    '''
-    N = r.shape[0]
-    times = np.arange(0,N,1)
-    # compute the square error returns
-    sq_errs = pd.DataFrame( ( r - r.mean() )**2 )
-    # exponential weights
-    weights = [ decay**(N-t) for t in times ] / np.sum(decay**(N-times))
-    weights = pd.DataFrame(weights, index=r.index)
-    # EWA
-    vol_ewa = (weights * sq_errs).sum()**(0.5)
-    # Annualize the computed volatility
-    ann_vol_ewa = vol_ewa[0] * np.sqrt(periods_per_year)
-    return ann_vol_ewa
-
+# ---------------------------------------------------------------------------------
+# Covariance matrix estimators
+# ---------------------------------------------------------------------------------
 def sample_cov(r, **kwargs):
     '''
     Returns the sample covariance of the supplied series of returns (a pd.DataFrame) 
@@ -1366,9 +1307,82 @@ def shrinkage_cov(r, delta=0.5, **kwargs):
     const_cov = cc_cov(r, **kwargs)
     return delta*const_cov + (1-delta)*samp_cov
 
+# ---------------------------------------------------------------------------------
+# Back-test weigthing schemes
+# ---------------------------------------------------------------------------------
+def weight_ew(r, cap_ws=None, max_cw_mult=None, microcap_thr=None, **kwargs):
+    """
+    Returns the weights of the Equally-Weighted (EW) portfolio based on the asset returns "r" as a DataFrame. 
+    If the set of cap_ws is given, the modified scheme is computed, i.e., 
+    microcaps are removed and a capweight tether applied.
+    """
+    ew = pd.Series(1/len(r.columns), index=r.columns)
+    if cap_ws is not None:
+        cw = cap_ws.loc[r.index[0]] # starting cap weight
+        if microcap_thr is not None and microcap_thr > 0.0:
+            # exclude microcaps according to the threshold    
+            ew[ cw < microcap_thr ] = 0
+            ew = ew / ew.sum()
+        if max_cw_mult is not None and max_cw_mult > 0:
+            # limit weight up to a multiple of capweight
+            ew = np.minimum(ew, cw*max_cw_mult)
+            ew = ew / ew.sum()
+    return ew
+
+def weight_cw(r, cap_ws, **kwargs):
+    '''
+    Returns the weights of the Cap-Weigthed (CW) portfolio based on the time series of capweights
+    '''
+    return cap_ws.loc[r.index[0]]
+    # which is equal to:
+    # w = cap_ws.loc[r.index[0]]
+    # return w / w.sum()
+    # since cap_ws are already normalized
+    
+def weight_rp(r, cov_estimator=sample_cov, **kwargs):
+    '''
+    Produces the weights of the risk parity portfolio given a covariance matrix of the returns.
+    The default coavariance estimator is the sample covariance matrix.
+    '''
+    est_cov = cov_estimator(r, **kwargs)
+    return risk_parity_weigths(est_cov)  
+
+def backtest_weight_scheme(r, window=36, weight_scheme=weight_ew, **kwargs):
+    '''
+    Backtests a given weighting scheme. Here:
+    - r: asset returns to use to build the portfolio
+    - window: the rolling window used
+    - weight_scheme: the weighting scheme to use, it must the name of a 
+    method that takes "r", and a variable number of keyword-value arguments
+    '''
+    n_periods = r.shape[0]
+    windows = [ (start, start+window) for start in range(0,n_periods-window) ]
+    weights = [ weight_scheme( r.iloc[win[0]:win[1]], **kwargs) for win in windows ]
+    weights = pd.DataFrame(weights, index=r.iloc[window:].index, columns=r.columns)    
+    returns = (weights * r).sum(axis=1,  min_count=1) #mincount is to generate NAs if all inputs are NAs
+    return returns
+
+def annualize_vol_ewa(r, decay=0.95, periods_per_year=12):
+    '''
+    Computes the annualized exponentially weighted average volatility of a 
+    series of returns given a decay (smoothing) factor in input. 
+    '''
+    N = r.shape[0]
+    times = np.arange(0,N,1)
+    # compute the square error returns
+    sq_errs = pd.DataFrame( ( r - r.mean() )**2 )
+    # exponential weights
+    weights = [ decay**(N-t) for t in times ] / np.sum(decay**(N-times))
+    weights = pd.DataFrame(weights, index=r.index)
+    # EWA
+    vol_ewa = (weights * sq_errs).sum()**(0.5)
+    # Annualize the computed volatility
+    ann_vol_ewa = vol_ewa[0] * np.sqrt(periods_per_year)
+    return ann_vol_ewa
+
 def weight_minvar(r, cov_estimator=sample_cov, periods_per_year=12, **kwargs):
     '''
-    Produces the weights of the Minimum Volatility portfolio given a covariance matrix of the returns 
+    Produces the weights of the Minimum Volatility Portfolio given a covariance matrix of the returns 
     '''
     est_cov = cov_estimator(r, **kwargs)
     ann_ret = annualize_rets(r, periods_per_year=12)
@@ -1376,12 +1390,15 @@ def weight_minvar(r, cov_estimator=sample_cov, periods_per_year=12, **kwargs):
 
 def weight_maxsharpe(r, cov_estimator=sample_cov, periods_per_year=12, risk_free_rate=0.03, **kwargs):
     '''
-    Produces the weights of the Maximum Sharpe Ratio portfolio given a covariance matrix of the returns 
+    Produces the weights of the Maximum Sharpe Ratio Portfolio given a covariance matrix of the returns 
     '''
     est_cov = cov_estimator(r, **kwargs)
     ann_ret = annualize_rets(r, periods_per_year=12)
     return maximize_shape_ratio(ann_ret, est_cov, risk_free_rate=risk_free_rate, periods_per_year=periods_per_year)
     
+# ---------------------------------------------------------------------------------
+# Black-Litterman model
+# ---------------------------------------------------------------------------------
 def implied_returns(covmat, weigths, delta=2.5):
     '''
     Computes the implied expected returns \Pi by reverse engineering the weights according to 
@@ -1447,6 +1464,9 @@ def black_litterman(w_prior, Sigma_prior, P, Q, Omega=None, delta=2.5, tau=0.02)
     sigma_bl = Sigma_prior + (tau * Sigma_prior) - (tau * Sigma_prior).dot(P.T).dot(invmat).dot(P).dot(tau * Sigma_prior)
     return (mu_bl, sigma_bl)
 
+# ---------------------------------------------------------------------------------
+# Risk contributions analysis 
+# ---------------------------------------------------------------------------------
 def enc(weigths):
     '''
     Computes the Effective Number of Constituents (ENC) given an input 
@@ -1475,9 +1495,57 @@ def portfolio_risk_contributions(weigths, matcov):
     risk_contrib = np.multiply(marginal_contrib, weigths.T) / portfolio_var
     return risk_contrib
 
+def msd_risk_contrib(weights, target_risk, mat_cov):
+    '''
+    Returns the Mean Squared Difference between the given target risk contribution vector and the 
+    risk contributions due to current weigths. 
+    This method implements the objective function to minimize which is called by the quadratic 
+    minimizer PORTFOLIO_RISK_CONTRIB_OPTIMIZER.
+    '''
+    w_risk_contribs = portfolio_risk_contributions(weights, mat_cov)
+    msd = (w_risk_contribs - target_risk)**2 
+    return msd.sum() #mean()
 
+def portfolio_risk_contrib_optimizer(target_risk_contrib, mat_cov):
+    '''
+    Returns the weights of the portfolio whose asset risk contributions are 
+    as close as possible to the input target_risk contribution vector. 
+    The input target_risk must be either a pd.Series or np.array while 
+    mat_cov must be a pd.DataFrame.
+    '''
+    n = mat_cov.shape[0]
+    init_guess = np.repeat(1/n, n)
 
+    # constraint on weights
+    weights_sum_to_one = {
+        'type': 'eq',
+        'fun': lambda weights: 1 - np.sum(weights)
+    }
+        
+    weights = minimize(msd_risk_contrib, 
+                       init_guess,
+                       args=(target_risk_contrib, mat_cov), 
+                       method='SLSQP',
+                       options={'disp': False},
+                       constraints=(weights_sum_to_one,),
+                       bounds=((0.0, 1.0),)*n )
+    return weights.x
 
+def risk_parity_weigths(mat_cov):
+    '''
+    Returns the weights of the portfolio that equalizes the asset risk contributions 
+    of the constituents, that is, return the risk parity portfolio. 
+    The method uses the quadratic optimizer PORTFOLIO_RISK_CONTRIB_OPTIMIZER with a target risk 
+    vector of 1/N, where N is the number of asset since we know that this is the value for 
+    which the ENCB=N.
+    '''
+    n = mat_cov.shape[0]
+    weigths = portfolio_risk_contrib_optimizer(target_risk_contrib=np.repeat(1/n,n), mat_cov=mat_cov)
+    return pd.Series(weigths, index=mat_cov.index)
+
+# ---------------------------------------------------------------------------------
+# Auxiliary methods 
+# ---------------------------------------------------------------------------------
 def as_colvec(x):
     '''
     In order to consistently use column vectors, this method takes either a np.array or a np.column 
