@@ -1447,6 +1447,20 @@ def black_litterman(w_prior, Sigma_prior, P, Q, Omega=None, delta=2.5, tau=0.02)
     sigma_bl = Sigma_prior + (tau * Sigma_prior) - (tau * Sigma_prior).dot(P.T).dot(invmat).dot(P).dot(tau * Sigma_prior)
     return (mu_bl, sigma_bl)
 
+def enc(weigths):
+    '''
+    Computes the Effective Number of Constituents (ENC) given an input 
+    vector of weights of a portfolio.
+    '''
+    return (weigths**2).sum()**(-1)
+
+def encb(risk_contrib):
+    '''
+    Computes the Effective Number of Correlated Bets (ENBC) given an input 
+    vector of portfolio risk contributions.
+    '''
+    return (risk_contrib**2).sum()**(-1)
+
 def portfolio_risk_contributions(weigths, matcov):
     '''
     Compute the contributions to risk of the asset constituents of a portfolio, 
