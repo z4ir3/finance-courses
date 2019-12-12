@@ -6,6 +6,9 @@ import statsmodels.api as sm
 from scipy.optimize import minimize
 from numpy.linalg import inv
 
+# ---------------------------------------------------------------------------------
+# Load and format data files
+# ---------------------------------------------------------------------------------
 def path_to_data_folder():
     return "/Users/mariacristinasampaolo/Documents/python/git-tracked/finance-courses/data/" 
 
@@ -124,6 +127,9 @@ def get_total_market_index(nind=30, capital=1000):
     total_market_index  = capital * (1 + total_market_return).cumprod()
     return total_market_index
 
+# ---------------------------------------------------------------------------------
+# Return Analysis and general statistics
+# ---------------------------------------------------------------------------------
 def terminal_wealth(s):
     '''
     Computes the terminal wealth of a sequence of return, which is, in other words, 
@@ -343,7 +349,10 @@ def sharpe_ratio(s, risk_free_rate, periods_per_year, v=None):
         # Portfolio case: s is supposed to be the single (already annnualized) 
         # return of the portfolio and v to be the single (already annualized) volatility. 
         return (s - risk_free_rate) / v
-    
+
+# ---------------------------------------------------------------------------------
+# Modern Portfolio Theory 
+# ---------------------------------------------------------------------------------
 def portfolio_return(weights, vec_returns):
     '''
     Computes the return of a portfolio. 
@@ -644,6 +653,9 @@ def weigths_max_sharpe_ratio(covmat, mu_exc, scale=True):
         w = w/sum(w) 
     return w
     
+# ---------------------------------------------------------------------------------
+# CPPI backtest strategy
+# ---------------------------------------------------------------------------------
 def cppi(risky_rets, safe_rets=None, start_value=1000, floor=0.8, m=3, drawdown=None,
          risk_free_rate=0.03, periods_per_year=12):
     '''
@@ -734,6 +746,9 @@ def cppi(risky_rets, safe_rets=None, start_value=1000, floor=0.8, m=3, drawdown=
 
     return backtest_result
 
+# ---------------------------------------------------------------------------------
+# Random walks
+# ---------------------------------------------------------------------------------
 def simulate_gbm_from_returns(n_years=10, n_scenarios=20, mu=0.07, sigma=0.15, periods_per_year=12, start=100.0):
     '''
     Evolution of an initial stock price using Geometric Brownian Model:
@@ -872,6 +887,9 @@ def show_cppi(n_years=10, n_scenarios=50, m=3, floor=0, mu=0.04, sigma=0.15,
         hist_ax.annotate("E(shortfall) (end period): ${:.2f}".format(e_shorfall), xy=(0.5, 0.65), xycoords="axes fraction", fontsize=15)
     hist_ax.set_title("Histogram of the CPPI wealth at the end of the period", fontsize=14)
 
+# ---------------------------------------------------------------------------------
+# Securities 
+# ---------------------------------------------------------------------------------
 def discount(t, r):
     '''
     Compute the price of a pure discount bond that pays 1 at time t (year),
@@ -1088,6 +1106,9 @@ def mac_duration(cash_flows, discount_rate):
     # sum of weights * dates
     return ( weights * pd.DataFrame(dates,index=weights.index) ).sum()[0]
 
+# ---------------------------------------------------------------------------------
+# Liability driven strategies 
+# ---------------------------------------------------------------------------------
 def ldi_mixer(psp_rets, lhp_rets, allocator, **kwargs):
     '''
     Liability-Driven Investing strategy allocator. 
@@ -1196,6 +1217,9 @@ def ldi_drawdown_allocator(psp_rets, lhp_rets, maxdd=0.2):
         weight_history.iloc[date] = psp_w
     return weight_history 
 
+# ---------------------------------------------------------------------------------
+# Factor and Style analysis 
+# ---------------------------------------------------------------------------------
 def linear_regression(dep_var, exp_vars, alpha=True):
     '''
     Runs a linear regression to decompose the dependent variable into the explanatory variables 
@@ -1205,11 +1229,15 @@ def linear_regression(dep_var, exp_vars, alpha=True):
     - .params for the coefficients
     - .tvalues and .pvalues for the significance levels
     - .rsquared_adj and .rsquared for quality of fit
+    Note that exp.vars can be both a pd.DataFrame a np.array.
     '''
     if alpha:
         # the OLS methods assume a bias equal to 0, hence a specific variable for the bias has to be given
-        exp_vars = exp_vars.copy()
-        exp_vars["Alpha"] = 1
+        if isinstance(exp_vars,pd.DataFrame):
+            exp_vars = exp_vars.copy()
+            exp_vars["Alpha"] = 1
+        else:
+            exp_vars = np.concatenate( (factors, np.ones((exp_vars.shape[0],1))), axis=1 )
     return sm.OLS(dep_var, exp_vars).fit()
 
 def capm_betas(ri, rm):
