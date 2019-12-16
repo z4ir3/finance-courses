@@ -293,7 +293,7 @@ def annualize_rets(s, periods_per_year):
     '''
     Computes the return per year, or, annualized return.
     The variable periods_per_year can be, e.g., 12, 52, 252, in 
-    case of yearly, weekly, and daily data.
+    case of monthly, weekly, and daily data.
     The method takes in input either a DataFrame or a Series and, in the former 
     case, it computes the annualized return for every column (Series) by using pd.aggregate
     '''
@@ -308,7 +308,7 @@ def annualize_vol(s, periods_per_year):
     '''
     Computes the volatility per year, or, annualized volatility.
     The variable periods_per_year can be, e.g., 12, 52, 252, in 
-    case of yearly, weekly, and daily data.
+    case of monthly, weekly, and daily data.
     The method takes in input either a DataFrame, a Series, a list or a single number. 
     In the former case, it computes the annualized volatility of every column 
     (Series) by using pd.aggregate. In the latter case, s is a volatility 
@@ -1237,7 +1237,7 @@ def linear_regression(dep_var, exp_vars, alpha=True):
             exp_vars = exp_vars.copy()
             exp_vars["Alpha"] = 1
         else:
-            exp_vars = np.concatenate( (factors, np.ones((exp_vars.shape[0],1))), axis=1 )
+            exp_vars = np.concatenate( (exp_vars, np.ones((exp_vars.shape[0],1))), axis=1 )
     return sm.OLS(dep_var, exp_vars).fit()
 
 def capm_betas(ri, rm):
