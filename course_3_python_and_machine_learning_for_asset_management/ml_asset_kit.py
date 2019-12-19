@@ -1,3 +1,4 @@
+import edhec_risk_kit as erk
 import sys
 import pandas as pd
 import numpy as np
@@ -220,3 +221,230 @@ def display_betas(betas, names):
     The input betas vector has to be a list or a np.array
     '''
     return pd.DataFrame(betas, columns=["beta"], index=names+["alpha"]).T
+
+
+
+
+
+
+def regime_hist(asset_rets, regime):
+    '''
+    Plot the histogram return of normal and crash regime givne in input a pd.Series of returns 
+    and the associated vector regime
+    '''
+    # compute returns of normal and crash regimes
+    asset_rets_g = asset_rets[regime==1]
+    asset_rets_c = asset_rets[regime==-1]
+    # plot
+    fig, ax = plt.subplots(1,2,figsize=(14,5))
+    asset_rets_g.hist(ax=ax[0], bins=25, grid=True, color='green', alpha=0.4, density=False,  label=None)
+    asset_rets_c.hist(ax=ax[1], bins=25, grid=True, color='red', alpha=0.4, density=False, label=None)
+    ax[0].axvline(x=asset_rets_g.mean(), linestyle="--", color="green", label="mean: {:.2f}".format(asset_rets_g.mean()))
+    ax[0].axvline(x=asset_rets_g.median(), linestyle="--", color="blue", label="median: {:.2f}".format(asset_rets_g.median()))
+    ax[1].axvline(x=asset_rets_c.mean(), linestyle="--", color="red", label="mean: {:.2f}".format(asset_rets_c.mean()))
+    ax[1].axvline(x=asset_rets_c.median(), linestyle="--", color="blue", label="median: {:.2f}".format(asset_rets_c.median()))
+    ax[0].set_xlabel('returns')
+    ax[1].set_xlabel('returns')
+    ax[0].set_ylabel('frequency')
+    ax[1].set_ylabel('frequency')
+    ax[0].set_title("Histogram returns of {} under Normal regime".format(asset_rets.name))
+    ax[1].set_title("Histogram returns of {} under Crash regime".format(asset_rets.name))
+    ax[0].legend()
+    ax[1].legend()
+    plt.show()
+    return ax
+
+def qqplot(rets, linetype="r"):
+    '''
+    Quantile-Quantile plot of an input pd.Series or np.array of returns using 
+    statsmodels qqplot method. The variable linetype can be = "45","s","r",or "q". 
+    '''
+    fig, ax = plt.subplots(1,1,figsize=(7,5))    
+    sm.qqplot(rets.values, line=linetype, ax=ax)
+    plt.title("Q-Q Plot of {}".format(rets.name))
+    plt.ylabel('returns')
+    plt.grid()
+    plt.show()
+    
+def regime_plot_cdf(ret_g, ret_c):
+    '''
+    Plot of the Cumulative Distribution Functions of a normal regime returns 
+    and a crash regime returns pd.Series.
+    '''
+    xg, yg = ecdf(ret_g)
+    xc, yc = ecdf(ret_c)
+    fig, ax = plt.subplots(1,1,figsize=(7,5))
+    ax.plot(xg, yg, color='green', label='Normal regime')
+    ax.plot(xc, yc, color='red', label='Crash regime')
+    ax.set_xlabel('returns')
+    ax.set_ylabel('cumulative probability')
+    ax.set_title("Cumulative Density of {}".format(ret_g.name))
+    ax.grid()
+    ax.legend()
+    plt.show()
+    return ax
+    
+def ecdf(data):
+    '''
+    Compute ECDF for a one-dimensional array of measurements.
+    '''
+    # Number of data points: n
+    n = len(data)
+    # x-data for the ECDF: x
+    x = np.sort(data)
+    # y-data for the ECDF: y
+    y = np.arange(1, n+1) / n
+    return x, y
+
+
+
+def trend_filtering(data,lambda_value):
+    '''
+    Runs the trend-filtering algorithm to separate regimes in a given series of returns.
+    The input data has to be a np.array of returns and lambda is a constant scalar.
+    '''
+    # objective function of the trend-filtering algorithm
+    def trend_filtering_obj(x,beta,lambd):
+        return cp.norm(x-beta,2)**2 + lambd*cp.norm(cp.matmul(D, beta),1)
+
+    n = np.size(data)
+    x_ret = data.reshape(n)
+
+    # creating first-order derivatives matrix
+    Dfull = np.diag([1]*n) - np.diag([1]*(n-1),1)
+    D = Dfull[0:(n-1),]
+
+    # set up the proble
+    beta  = cp.Variable(n)
+    lambd = cp.Parameter(nonneg=True)
+    problem = cp.Problem( cp.Minimize(trend_filtering_obj(x_ret, beta, lambd)) )
+
+    # solve the problem
+    lambd.value = lambda_value
+    problem.solve()
+
+    return beta.value
+
+def regime_switch(betas,threshold=1e-5):
+    '''
+    Returns a list of starting points of each regime given in input 
+    the beta vector as output from a trend-filtering algorithm.
+    '''
+    n = len(betas)
+    init_points = [0]
+    curr_reg = (betas[0]>threshold)
+    for i in range(n):
+        if (betas[i]>threshold) == (not curr_reg):
+            curr_reg = not curr_reg
+            init_points.append(i)
+    init_points.append(n)
+    return init_points
+
+def trend_filtering_plot(rets, lambda_value=0.1, figx=10, figy=5):
+    '''
+    Return a plot of the original series and the filtered fitted series given 
+    an input lambda value. 
+    '''
+    # finding betas by solving the minimization problems
+    betas = trend_filtering(rets.values, lambda_value)
+    betas = pd.Series(betas, index=rets.index)
+    # plot
+    fig, ax = plt.subplots(1,1,figsize=(figx,figy))
+    rets.plot(ax=ax, grid=True, alpha=0.4, label='original returns')
+    betas.plot(ax=ax, grid=True, label='fitted series')
+    ax.set_ylabel('returns')
+    ax.legend()
+    return ax
+
+def plot_regime_color(data, lambda_value=0.1, figx=9, figy=6):
+    '''
+    Plot a timeseries and corresponding regimes (normal or crash) according to 
+    the lambda value in input. Regimes are indetified by vertical coloured rectangles.
+    The input lambda_value is the lambda parameter (scalar) used by the 
+    trend-filtering algorithm.
+    '''
+    # compute returns
+    rets = erk.compute_returns(data).dropna()
+    # get betas from trend-filtering 
+    betas = trend_filtering(rets.values, lambda_value)
+    # find regimes switching points
+    regimelist = regime_switch(betas)
+    curr_reg = np.sign(betas[0]-1e-5)
+    
+    fig, ax = plt.subplots(1,1,figsize=(figx,figy))
+    for i in range(len(regimelist)-1):
+        if curr_reg == 1:
+            pass
+            # uncomment below if we want to color the normal regimes
+            #ax.axhspan(0, data.max(), xmin=regimelist[i]/regimelist[-1], xmax=regimelist[i+1]/regimelist[-1], 
+            #          facecolor="green", alpha=0.3)
+        else:
+            ax.axhspan(0, data.max(),  xmin=regimelist[i]/regimelist[-1], xmax=regimelist[i+1]/regimelist[-1], 
+                       facecolor='gray', alpha=0.5)
+        curr_reg = -1 * curr_reg
+        
+    data.plot(ax=ax, grid=True)
+    ax.set_ylabel("value")
+    ax.set_title('Regime plot')
+    ax.set_yscale('log')
+    plt.show()
+    return ax
+
+
+def efficient_frontier_two_regimes(rets, rets_g, rets_c, periods_per_year=12, n_ports=20, n_scenarios=10000, figx=8, figy=6):
+    '''
+    Plot the efficient frontiers from single regime model (i.e., traditional Markowitz efficient frontier) versus
+    the efficient frontier obtained by sampling separated returns for the normal and the crash regime that given input. 
+    The variable n_ports denotes the number of points on the efficient frontiers to be plotted, 
+    whereas n_scenarios the total number of returns (normal+chrash) to be sampled for the wo-regimes case.  
+    '''
+    # annualize returns and computes the cov matrix 
+    ann_rets = erk.annualize_rets(rets, periods_per_year=periods_per_year)
+    cov_rets = rets.cov()
+    
+    # range of total expected returns 
+    rets_range = np.linspace(ann_rets.min(),ann_rets.max(),n_ports)    
+    
+    # compute the efficient frontiers for the entire dataframe: single regime 
+    vol_single, ret_single = [], []
+    for r in rets_range:
+        ww = erk.minimize_volatility(ann_rets, cov_rets, target_return=r)
+        ret_single.append( erk.portfolio_return(ww, ann_rets) )
+        vol_single.append( erk.annualize_vol( erk.portfolio_volatility(ww,cov_rets), periods_per_year=periods_per_year) )
+
+    # compute the efficient frontiers for the normal and crash dataframes: two regimes 
+    # sample from multivariate normal distribution with given mean and cov 
+    
+    # annual returns
+    ann_rets_g = erk.annualize_rets(rets_g, periods_per_year=periods_per_year)
+    ann_rets_c = erk.annualize_rets(rets_c, periods_per_year=periods_per_year)
+    
+    # sampling
+    n_g = int( n_scenarios * rets_g.shape[0] / rets.shape[0] )
+    s_1 = np.random.multivariate_normal(ann_rets_g, rets_g.cov()*periods_per_year, n_g)
+    s_2 = np.random.multivariate_normal(ann_rets_c, rets_c.cov()*periods_per_year, n_scenarios-n_g)
+    # note that we have multiplied the cov * periods_per_year because we are using annualized data, i.e., 
+    # the mean value are the annual returns, hence the cov matrix has to be scaled accordingly 
+    rets_two = pd.DataFrame( np.vstack((s_1,s_2)), columns=rets.columns )
+    # new annual return and covariance matrix 
+    ann_rets_two = rets_two.mean()
+    cov_rets_two = rets_two.cov()
+    # and now note that ann_rets_two is the mean since we sampled using means equal to the annual returns, 
+    # then we do not have to annualize again
+        
+    vol_two, ret_two = [], []
+    for r in rets_range:
+        ww = erk.minimize_volatility(ann_rets_two, cov_rets_two, target_return=r)
+        ret_two.append( erk.portfolio_return(ww, ann_rets_two) )
+        vol_two.append( erk.portfolio_volatility(ww,cov_rets_two) )
+        # here note that we don't have to annualize the volatility since the covmatrix was already annualized 
+        
+    fig, ax = plt.subplots(1,1,figsize=(figx,figy))
+    ax.plot(vol_single, ret_single, "xb-", label="Eff. Frontier Single regime")
+    ax.plot(vol_two, ret_two, "xr-", label="Eff. Frontier Two regimes")
+    ax.grid()
+    ax.legend()
+    plt.show()
+  
+    return ax    
+    
