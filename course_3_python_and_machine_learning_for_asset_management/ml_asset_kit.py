@@ -390,7 +390,6 @@ def plot_regime_color(data, lambda_value=0.1, figx=9, figy=6):
     plt.show()
     return ax
 
-
 def efficient_frontier_two_regimes(rets, rets_g, rets_c, periods_per_year=12, n_ports=20, n_scenarios=10000, figx=8, figy=6):
     '''
     Plot the efficient frontiers from single regime model (i.e., traditional Markowitz efficient frontier) versus
@@ -447,4 +446,104 @@ def efficient_frontier_two_regimes(rets, rets_g, rets_c, periods_per_year=12, n_
     plt.show()
   
     return ax    
+
+def regime_asset(n,mu1,mu2,Q1,Q2,p1,p2):
+    '''
+    Simulates normal and crash returns (a total of n) from multivariate distribution with given input means 
+    and covariances and generate a regime vector by switching returns according to 
+    probability transitions:
+    - p1: probability of remaining in regime 1 if we are in regime 1 
+    - p2: probability of going to regime 1 if we are in regime 2
+    '''
+    s_1 = np.random.multivariate_normal(mu1, Q1, n).T
+    s_2 = np.random.multivariate_normal(mu2, Q2, n).T
+    regime = np.ones(n)
+    for i in range(n-1):
+        if regime[i] == 1:
+            if np.random.rand() > p1:
+                regime[i+1] = 0
+        else:
+            if np.random.rand() < p2:
+                regime[i+1] = 1
+    return (regime*s_1 + (1-regime)*s_2).T
+
+def transition_matrix(regime):
+    '''
+    Computes the transition matrix given the regime vector. Here
+    - p11 is the probability of staying in regime 1 given that current regime is 1
+    - p12 is the probability of moving to regime 2 given that current regime is 1
+    - p21 is the probability of moving to regime 1 given that current regime is 2
+    - p22 is the probability of staying in regime 2 given that current regime is 2
+    Note that in the regime vector, regime 1 is 1 (supposed to be normal) 
+    and regime 2 is -1 (supposed to be crash). 
+    '''
+    n1,n2,n3,n4 = 0,0,0,0
+    for i in range(len(regime)-1):
+        if regime[i] == 1:
+            # current regime is 1
+            if regime[i+1] == 1:
+                n1 += 1
+            else:
+                n2 += 1
+        else:
+            # current regime is 0
+            if regime[i+1] == 1:
+                n3 += 1
+            else:
+                n4 += 1
+    p11 = n1 / (n1+n2)
+    p12 = n2 / (n1+n2)
+    p21 = n3 / (n3+n4)
+    p22 = n4 / (n3+n4)
+    return p11, p12, p21, p22
+
+def regime_based_simulated_rets(rets, rets_g, rets_c, regime, periods_per_years=12, n_years=50, n_scenarios=1000):
+    '''
+    Simulates regime-based returns given in input pd.Dataframe data and a regime vector 
+    identified by regime_name (which is a column of data).
+    The variable assets_name denotes the columns' name of data corresponding to the assets we want to use.
+    The simulated results are stored into a (n_year*periods_per_years)*len(assets_name)*n_scenario tensor 
+    '''
+    # compute returns
+    #rets_all = erk.compute_returns( data[assets_name] ).dropna()
+    
+    # returns of regular and crash regime according to the regime vector 
+    #rets_g = rets_all[ (data[regime_name]==1)[1:]  ]
+    #rets_c = rets_all[ (data[regime_name]==-1)[1:] ]
+    
+    # compute transition probabilities given the input regime vector 
+    p1, _, p2, _ = transition_matrix( regime )
+    
+    # compute fixed return period (like return per month)
+    mu1 = ( (1+rets_g).prod() )**(1/rets_g.shape[0]) - 1
+    mu2 = ( (1+rets_c).prod() )**(1/rets_c.shape[0]) - 1
+    # covariances
+    Q1 = rets_g.cov()
+    Q2 = rets_c.cov()
+    
+    r_all = np.zeros((n_years*periods_per_years, len(rets.columns), n_scenarios))
+    for i in range(n_scenarios):
+        r_all[:,:,i] = regime_asset(n_years*periods_per_years,mu1,mu2,Q1,Q2,p1,p2)
+    
+    return r_all
+
+def simulate_fund_wealth(r_all, assets_names, holdings, start=100):
+    '''
+    Generates the portfolio simulated wealth given in input a r_all array of many scenarios 
+    for a given array of (fixed) weights holdings
+    '''
+    n_scenarios = r_all.shape[2]
+
+    # create weights dataframe
+    ww = pd.DataFrame( [holdings]*r_all.shape[0], columns=assets_names)
+
+    portf_sim = pd.DataFrame()
+    portfolio_rets = pd.DataFrame()
+    for n in range(n_scenarios):
+        sim_rets = pd.DataFrame(r_all[:,:,n], columns=assets_names)
+        portfolio_wealth = start * (1 + ww.multiply(sim_rets).sum(axis=1) ).cumprod()
+        portf_sim = pd.concat([portf_sim,portfolio_wealth], axis=1)
+
+    portf_sim.columns = range(r_all.shape[2])
+    return portf_sim
     
