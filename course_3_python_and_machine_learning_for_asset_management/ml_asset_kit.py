@@ -1,4 +1,3 @@
-import edhec_risk_kit as erk
 import sys
 import pandas as pd
 import numpy as np
@@ -10,6 +9,10 @@ from sklearn.linear_model import LinearRegression, Lasso, Ridge, ElasticNet
 from sklearn.model_selection import KFold, GridSearchCV
 from scipy.optimize import minimize
 from pandas_datareader import data 
+
+sys.path.append("../")
+import edhec_risk_kit as erk
+
 
 def path_to_data_folder():
     return "/Users/mariacristinasampaolo/Documents/python/git-tracked/finance-courses/course_3_python_and_machine_learning_for_asset_management/data/" 
