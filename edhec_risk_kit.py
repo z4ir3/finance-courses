@@ -10,7 +10,7 @@ from numpy.linalg import inv
 # Load and format data files
 # ---------------------------------------------------------------------------------
 def path_to_data_folder():
-    return "/Users/mariacristinasampaolo/Documents/python/git-tracked/finance-courses/data/" 
+    return "/Users/leonardorocchi/Documents/Coding/Python/finance-courses/data/" 
 
 def get_ffme_returns():
     '''
@@ -70,14 +70,14 @@ def get_ind_file(filetype="rets", nind=30, ew=False):
     '''
     if nind!=30 and nind!=49:
         raise ValueError("Expected either 30 or 49 number of industries")
-    if filetype is "rets":
+    if filetype == "rets":
         portfolio_w = "ew" if ew==True else "vw" 
         name = "{}_rets" .format( portfolio_w )
         divisor = 100.0
-    elif filetype is "nfirms":
+    elif filetype == "nfirms":
         name = "nfirms"
         divisor = 1
-    elif filetype is "size":
+    elif filetype == "size":
         name = "size"
         divisor = 1
     else:
