@@ -304,7 +304,7 @@ def annualize_rets(s, periods_per_year):
         n_period_growth = s.shape[0]
         return growth**(periods_per_year/n_period_growth) - 1
 
-def annualize_vol(s, periods_per_year):
+def annualize_vol(s, periods_per_year, ddof=1):
     '''
     Computes the volatility per year, or, annualized volatility.
     The variable periods_per_year can be, e.g., 12, 52, 252, in 
@@ -317,9 +317,9 @@ def annualize_vol(s, periods_per_year):
     if isinstance(s, pd.DataFrame):
         return s.aggregate(annualize_vol, periods_per_year=periods_per_year )
     elif isinstance(s, pd.Series):
-        return s.std() * (periods_per_year)**(0.5)
+        return s.std(ddof=ddof) * (periods_per_year)**(0.5)
     elif isinstance(s, list):
-        return np.std(s) * (periods_per_year)**(0.5)
+        return np.std(s, ddof=ddof) * (periods_per_year)**(0.5)
     elif isinstance(s, (int,float)):
         return s * (periods_per_year)**(0.5)
 
@@ -1390,19 +1390,21 @@ def backtest_weight_scheme(r, window=36, weight_scheme=weight_ew, **kwargs):
     returns = (weights * r).sum(axis=1,  min_count=1) #mincount is to generate NAs if all inputs are NAs
     return returns
 
-def annualize_vol_ewa(r, decay=0.95, periods_per_year=12):
+def annualize_vol_ewa(r, 
+                      decay            = 0.95, 
+                      periods_per_year = 12):
     '''
     Computes the annualized exponentially weighted average volatility of a 
     series of returns given a decay (smoothing) factor in input. 
     '''
     N = r.shape[0]
-    times = np.arange(0,N,1)
-    # compute the square error returns
+    times = np.arange(1,N+1,1)
+    # Compute the square error returns
     sq_errs = pd.DataFrame( ( r - r.mean() )**2 )
-    # exponential weights
+    # Exponential weights
     weights = [ decay**(N-t) for t in times ] / np.sum(decay**(N-times))
     weights = pd.DataFrame(weights, index=r.index)
-    # EWA
+    # EWMA
     vol_ewa = (weights * sq_errs).sum()**(0.5)
     # Annualize the computed volatility
     ann_vol_ewa = vol_ewa[0] * np.sqrt(periods_per_year)
